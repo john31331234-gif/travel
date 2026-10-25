@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#FFF0A0">
+  <meta name="description" content="엑셀로 여행 일정을 올리면 정해진 시간마다 알려 주는 여행 도우미">
+  <title>트립알림</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="메뉴">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#i-plane"/></svg></span>
+        <span class="brand-name">트립알림</span>
+      </div>
+      <nav class="side-nav">
+        <button class="nav-item" data-view="today"><svg><use href="#i-dash"/></svg>오늘 일정</button>
+        <button class="nav-item" data-view="schedule"><svg><use href="#i-calendar"/></svg>전체 일정</button>
+        <button class="nav-item" data-view="budget"><svg><use href="#i-wallet"/></svg>여행 경비</button>
+        <button class="nav-item" data-view="upload"><svg><use href="#i-sheet"/></svg>엑셀 업로드</button>
+        <button class="nav-item" data-view="tools"><svg><use href="#i-exchange"/></svg>여행 도구</button>
+        <button class="nav-item" data-view="settings"><svg><use href="#i-settings"/></svg>설정</button>
+      </nav>
+      <div class="trip-card" id="trip-card"></div>
+    </aside>
+
+    <main class="main" id="main">
+      <!-- 오늘 -->
+      <section class="view" id="view-today" aria-labelledby="today-title">
+        <header class="page-head">
+          <div>
+            <p class="eyebrow" id="today-eyebrow"></p>
+            <h1 class="display" id="today-title"><span class="city-name"></span><span class="doodle-underline" aria-hidden="true"></span></h1>
+          </div>
+          <button class="loc-btn" data-view="settings" aria-label="여행지 바꾸기"><svg><use href="#i-pin"/></svg><span class="city-label"></span> ▾</button>
+        </header>
+        <div class="today-grid">
+          <div class="today-main">
+            <div id="next-alert"></div>
+            <div class="pills" id="day-pills" role="tablist" aria-label="여행 날짜"></div>
+            <div class="section-head">
+              <h2 id="list-title">오늘 일정 <span class="doodle-star" aria-hidden="true"></span></h2>
+              <span class="btn-row">
+                <button class="link" data-add="" id="today-add"><svg><use href="#i-plus"/></svg>추가</button>
+                <button class="link" data-view="schedule">전체 보기</button>
+              </span>
+            </div>
+            <div class="cards" id="today-list"></div>
+          </div>
+          <div class="today-aside widgets" data-widgets></div>
+        </div>
+      </section>
+
+      <!-- 전체 일정 -->
+      <section class="view" id="view-schedule" hidden>
+        <header class="page-head">
+          <div>
+            <p class="eyebrow">엑셀에서 불러온 일정</p>
+            <h1 class="display">Schedule</h1>
+          </div>
+          <span class="btn-row">
+            <button class="btn btn-primary" data-add=""><svg><use href="#i-plus"/></svg>일정 추가</button>
+            <button class="btn btn-secondary" data-view="upload"><svg><use href="#i-upload"/></svg>엑셀</button>
+          </span>
+        </header>
+        <div id="schedule-list"></div>
+      </section>
+
+      <!-- 경비 -->
+      <section class="view" id="view-budget" hidden>
+        <header class="page-head">
+          <div>
+            <p class="eyebrow">엑셀 "여행경비" 표</p>
+            <h1 class="display">Budget</h1>
+          </div>
+        </header>
+        <div class="budget-grid" id="budget-body"></div>
+      </section>
+
+      <!-- 업로드 -->
+      <section class="view" id="view-upload" hidden>
+        <header class="page-head">
+          <div>
+            <p class="eyebrow">일정 불러오기</p>
+            <h1 class="title">엑셀로 여행 일정을 한 번에 등록해요</h1>
+          </div>
+          <button class="link" id="template-btn">양식 다운로드 (.xlsx)</button>
+        </header>
+        <div class="upload-grid">
+          <div class="upload-main">
+            <label class="drop" id="drop">
+              <input type="file" id="file-input" accept=".xlsx,.xls,.csv" hidden>
+              <span class="drop-note" aria-hidden="true">여기 톡!</span>
+              <span class="drop-icon"><svg><use href="#i-upload"/></svg></span>
+              <strong>파일 선택하기<span class="doodle-underline" aria-hidden="true"></span></strong>
+              <span class="muted">끌어다 놓거나 눌러서 선택 · .xlsx · .xls · .csv</span>
+            </label>
+            <div id="upload-result"></div>
+            <button class="btn btn-secondary full" data-add=""><svg><use href="#i-plus"/></svg>엑셀 없이 직접 일정 만들기</button>
+            <button class="link center" id="sample-btn">예시 일정으로 체험해 보기</button>
+          </div>
+          <div class="upload-side">
+            <div class="card">
+              <h3 class="card-title"><svg><use href="#i-sheet"/></svg>이런 열을 알아봐요</h3>
+              <ul class="col-guide">
+                <li><b>날짜</b> 10/26, 2026-10-26, 10월 26일 <i>(또는 "일차")</i></li>
+                <li><b>시간</b> 09:30, 오후 2시, 14시</li>
+                <li><b>일정</b> 제목 · 내용 · 활동</li>
+                <li><b>장소</b> 주소 · 위치 <i>(선택)</i></li>
+                <li><b>메모</b> 비고 · 참고 <i>(선택)</i></li>
+                <li><b>알림</b> 10분 전, 1시간 전, 정각, 없음 <i>(선택)</i></li>
+              </ul>
+              <p class="muted small">첫 줄은 열 이름이어야 해요. 열 이름이 조금 달라도 위 단어가 들어가면 자동으로 맞춰요.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 도구 -->
+      <section class="view" id="view-tools" hidden>
+        <header class="page-head">
+          <div>
+            <p class="eyebrow">여행 도구</p>
+            <h1 class="display">Toolkit</h1>
+          </div>
+        </header>
+        <div class="widgets tools-grid" data-widgets></div>
+      </section>
+
+      <!-- 설정 -->
+      <section class="view" id="view-settings" hidden>
+        <header class="page-head">
+          <div>
+            <p class="eyebrow">설정</p>
+            <h1 class="display">Settings</h1>
+          </div>
+        </header>
+        <div class="settings-grid">
+          <div class="card">
+            <h3 class="card-title"><svg><use href="#i-bell"/></svg>알림</h3>
+            <div class="setting">
+              <div><b>브라우저 알림</b><p class="muted small" id="notify-status">일정 시간에 팝업으로 알려요</p></div>
+              <button class="toggle" id="t-notify" role="switch" aria-checked="false" aria-label="브라우저 알림"></button>
+            </div>
+            <div class="setting">
+              <div><b>소리</b><p class="muted small">알림이 올 때 효과음을 재생해요</p></div>
+              <button class="toggle" id="t-sound" role="switch" aria-checked="true" aria-label="소리"></button>
+            </div>
+            <p class="label">기본 알림 시점 <span class="muted small">(엑셀에 "알림" 열이 없을 때)</span></p>
+            <div class="pills wrap" id="lead-pills"></div>
+            <button class="btn btn-secondary full" id="test-notify"><svg><use href="#i-bell"/></svg>알림 테스트</button>
+          </div>
+          <div class="card">
+            <h3 class="card-title"><svg><use href="#i-globe"/></svg>여행지</h3>
+            <label class="field"><span>여행지 (시간대 · 통화 · 날씨)</span><select id="city-select"></select></label>
+            <label class="field"><span>여행 이름</span><input id="trip-name" placeholder="예: 파리 · 바르셀로나"></label>
+            <label class="field"><span>1일차 날짜 <span class="muted small">(엑셀에 "일차"만 있을 때)</span></span><input type="date" id="start-date"></label>
+            <p class="muted small">엑셀의 시간은 여행지 현지 시각으로 계산해요.</p>
+          </div>
+          <div class="card">
+            <h3 class="card-title"><svg><use href="#i-settings"/></svg>데이터</h3>
+            <p class="sync-note" data-sync-status>일정은 이 기기 브라우저에만 저장돼요.</p>
+            <p class="muted small">알림 설정과 준비물 체크는 기기마다 따로 저장돼요.</p>
+            <button class="btn btn-secondary full" id="export-btn"><svg><use href="#i-sheet"/></svg>지금 일정을 엑셀로 저장</button>
+            <button class="btn btn-secondary full" data-view="upload"><svg><use href="#i-upload"/></svg>다른 엑셀 올리기</button>
+            <button class="btn btn-danger full" id="clear-btn">일정 모두 지우기</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <nav class="tabbar" aria-label="하단 메뉴">
+      <button class="tab" data-view="today"><svg><use href="#i-dash"/></svg>오늘</button>
+      <button class="tab" data-view="schedule"><svg><use href="#i-calendar"/></svg>일정</button>
+      <button class="tab" data-view="budget"><svg><use href="#i-wallet"/></svg>경비</button>
+      <button class="tab" data-view="tools"><svg><use href="#i-exchange"/></svg>도구</button>
+      <button class="tab" data-view="settings"><svg><use href="#i-settings"/></svg>설정</button>
+    </nav>
+  </div>
+
+  <dialog class="sheet" id="detail" aria-labelledby="detail-title"></dialog>
+  <div class="toast-wrap" id="toasts" aria-live="polite"></div>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-plane" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></symbol>
+      <symbol id="i-dash" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+      <symbol id="i-sheet" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2M14 13h2M8 17h2M14 17h2"/></symbol>
+      <symbol id="i-exchange" viewBox="0 0 24 24"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+      <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+      <symbol id="i-weather" viewBox="0 0 24 24"><path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M20 12h2"/><path d="m19.07 4.93-1.41 1.41"/><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+      <symbol id="i-checklist" viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></symbol>
+      <symbol id="i-ext" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+      <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+      <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+    </defs>
+  </svg>
+
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
