@@ -349,4 +349,10 @@ details.more[open] summary { margin-bottom: 10px; }
 .sync-note[data-state="error"], .sync-note[data-state="readonly"] { background: var(--warning-soft); color: var(--warning); }
 .trip-card .sync-note { font-size: 13px; padding: 4px 8px; }
 
+.login-form { display: flex; flex-direction: column; gap: 10px; }
+.login-btns .btn { flex: 1; }
+.login-btns { display: flex; }
+.account-email { font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+#account { display: flex; flex-direction: column; gap: 10px; }
+
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

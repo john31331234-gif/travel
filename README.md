@@ -42,6 +42,27 @@
 - **아이폰**: Safari에서 공유 → **홈 화면에 추가**한 뒤 그 아이콘으로 열어야 알림을 받을 수 있어요(iOS 16.4 이상).
 - **안드로이드 크롬**: 처음 알림을 켤 때 권한을 허용해 주세요. 홈 화면에 추가하면 앱처럼 쓸 수 있어요.
 
+## 로그인 · 기기 간 공유 (Firebase)
+
+설정 탭의 **계정 · 기기 간 공유**에서 이메일과 비밀번호로 가입·로그인하면, 일정 · 경비 · 실제 지출이
+Firebase(`travel-6fd2d`)의 `users/<계정 ID>/trips/current` 문서에 저장되고 같은 계정의 모든 기기에 실시간으로 맞춰져요.
+알림 설정과 보낸 알림 기록은 기기마다 따로예요. 로그인하지 않으면 지금처럼 그 기기에만 저장돼요.
+
+Firestore 보안 규칙(Firebase 콘솔 → Firestore Database → 규칙):
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
+```
+
+Authentication → 설정 → 승인된 도메인에 `john31331234-gif.github.io`가 있어야 해요.
+
 ## 일정 미리 넣어 두기
 
 `data/preset.json`과 엑셀 파일을 함께 배포하면, 일정이 비어 있는 브라우저에서 열 때 그 엑셀을 자동으로 불러와요.

@@ -144,6 +144,10 @@
           </div>
         </header>
         <div class="settings-grid">
+          <div class="card" hidden>
+            <h3 class="card-title"><svg><use href="#i-globe"/></svg>계정 · 기기 간 공유</h3>
+            <div id="account"></div>
+          </div>
           <div class="card">
             <h3 class="card-title"><svg><use href="#i-bell"/></svg>알림</h3>
             <div class="setting">
@@ -215,6 +219,9 @@
   </svg>
 
   <script src="vendor/xlsx.full.min.js"></script>
+  <script src="vendor/firebase/firebase-app-compat.js"></script>
+  <script src="vendor/firebase/firebase-auth-compat.js"></script>
+  <script src="vendor/firebase/firebase-firestore-compat.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

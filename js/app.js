@@ -1109,20 +1109,24 @@
   // trip/current 문서 하나에 여행 이름 · 여행지 · 일정 · 경비/점검 표를 둔다. 여러 기기와 다른 Claude 대화가
   // 같은 문서를 읽고 쓴다. 알림 설정과 보낸 알림 기록은 기기마다 따로(localStorage) 둔다.
   // 문서에 items가 없고 book(엑셀 시트 행 배열)만 있으면 사이트가 직접 읽어 일정을 만든다.
-  const sync = { ref: null, canWrite: true, lastJson: null, timer: null, writing: Promise.resolve(), status: 'local', first: true };
+  // 같은 방식으로 GitHub Pages에서는 Firebase(로그인한 계정의 users/<uid>/trips/current 문서)를 쓴다.
+  // kind: 'claude'(미리보기 공유 저장소) | 'firebase'(계정) | null
+  const sync = { ref: null, kind: null, unsub: null, canWrite: true, lastJson: null, timer: null, writing: Promise.resolve(), status: 'local', first: true };
   const sharedState = () => JSON.parse(JSON.stringify({ tripName: state.settings.tripName || '', city: state.settings.city, items: state.items, extras: state.extras || null }));
   const setSyncStatus = (status, detail) => {
     sync.status = status;
+    const where = sync.kind === 'firebase' ? '계정' : '공유 저장소';
     const text = {
-      local: '일정은 이 기기 브라우저에만 저장돼요.',
-      connecting: '공유 저장소에 연결하는 중…',
-      synced: '공유 저장소와 연결됨 · 다른 기기와 Claude 대화에서도 같은 일정을 봐요.',
-      saving: '공유 저장소에 저장하는 중…',
+      local: fb.ready ? '로그인하지 않아서 일정이 이 기기에만 저장돼요.' : '일정은 이 기기 브라우저에만 저장돼요.',
+      connecting: `${where}에 연결하는 중…`,
+      synced: sync.kind === 'firebase' ? '계정에 저장됨 · 같은 계정으로 로그인한 모든 기기에서 같은 일정을 봐요.' : '공유 저장소와 연결됨 · 다른 기기와 Claude 대화에서도 같은 일정을 봐요.',
+      saving: `${where}에 저장하는 중…`,
       readonly: '보기 전용이라 고친 내용은 이 기기에만 남아요.',
-      error: `공유 저장소에 저장하지 못했어요${detail ? ` (${detail})` : ''}. 고친 내용은 이 기기에 남아 있어요.`,
+      error: `${where}에 저장하지 못했어요${detail ? ` (${detail})` : ''}. 고친 내용은 이 기기에 남아 있어요.`,
     }[status];
     $$('[data-sync-status]').forEach(el => { el.textContent = text; el.dataset.state = status; });
   };
+  const syncErrorText = e => !e ? '' : e.code === 'permission-denied' ? '권한 없음 · Firestore 보안 규칙을 확인해 주세요' : e.code === 'unavailable' ? '인터넷 연결 확인' : e.code || '';
   function scheduleShared() {
     if (!sync.ref || !sync.canWrite || sync.lastJson == null) return;
     clearTimeout(sync.timer);
@@ -1135,8 +1139,8 @@
         .then(() => sync.ref.set({ ...body, updatedAt: new Date().toISOString(), updatedBy: 'site' }))
         .then(() => setSyncStatus('synced'))
         .catch(e => {
-          if (e && e.code === 'invalid_argument' && JSON.stringify(body).length < 250000) { sync.canWrite = false; setSyncStatus('readonly'); }
-          else setSyncStatus('error', e && e.code);
+          if (sync.kind === 'claude' && e && e.code === 'invalid_argument' && JSON.stringify(body).length < 250000) { sync.canWrite = false; setSyncStatus('readonly'); }
+          else { sync.lastJson = null; setSyncStatus('error', syncErrorText(e)); }
         });
     }, 600);
   }
@@ -1174,20 +1178,104 @@
     setSyncStatus('synced');
     if (changed) {
       if (!sync.first) toast('일정이 업데이트됐어요', `${d.updatedBy === 'site' ? '다른 기기' : 'Claude'}에서 바꾼 내용을 받았어요`);
+      else if (sync.kind === 'firebase') toast('계정의 일정을 불러왔어요', `${incoming.items.length}개 일정`);
       if ($('#detail').open && !$('#edit-form')) $('#detail').close();
       render();
     }
     sync.first = false;
+  };
+  const attachDoc = (kind, ref) => {
+    if (sync.unsub) { try { sync.unsub(); } catch { /* 이미 끊김 */ } }
+    clearTimeout(sync.timer);
+    Object.assign(sync, { kind, ref, unsub: null, canWrite: true, lastJson: null, first: true });
+    if (!ref) { setSyncStatus('local'); return; }
+    setSyncStatus('connecting');
+    sync.unsub = ref.onSnapshot(applyShared, e => setSyncStatus('error', syncErrorText(e)));
   };
   const initShared = async () => {
     if (!window.claude || typeof window.claude.use !== 'function') return false;
     let db = null;
     try { db = await window.claude.use('db'); } catch { db = null; }
     if (!db) return false;
-    sync.ref = db.doc('trip/current');
-    setSyncStatus('connecting');
-    sync.ref.onSnapshot(applyShared, e => setSyncStatus('error', e && e.code));
+    attachDoc('claude', db.doc('trip/current'));
     return true;
+  };
+
+  // ---------- 로그인 (Firebase · GitHub Pages 등 일반 사이트에서) ----------
+  const FIREBASE_CONFIG = {
+    apiKey: 'AIzaSyAqW77wiHgampjaegS3LtBb1FUegdHZvxo',
+    authDomain: 'travel-6fd2d.firebaseapp.com',
+    projectId: 'travel-6fd2d',
+    storageBucket: 'travel-6fd2d.firebasestorage.app',
+    messagingSenderId: '139758128237',
+    appId: '1:139758128237:web:650fc9b457b8a482790364',
+  };
+  const fb = { ready: false, auth: null, db: null, user: null, busy: false };
+  const AUTH_ERRORS = {
+    'auth/invalid-email': '이메일 형식이 맞지 않아요.',
+    'auth/missing-password': '비밀번호를 입력해 주세요.',
+    'auth/weak-password': '비밀번호는 6자 이상이어야 해요.',
+    'auth/email-already-in-use': '이미 가입된 이메일이에요. 로그인을 눌러 주세요.',
+    'auth/invalid-credential': '이메일 또는 비밀번호가 맞지 않아요.',
+    'auth/invalid-login-credentials': '이메일 또는 비밀번호가 맞지 않아요.',
+    'auth/wrong-password': '이메일 또는 비밀번호가 맞지 않아요.',
+    'auth/user-not-found': '가입되지 않은 이메일이에요. 회원가입을 눌러 주세요.',
+    'auth/too-many-requests': '시도가 너무 많아요. 잠시 뒤 다시 해 주세요.',
+    'auth/network-request-failed': '인터넷 연결을 확인해 주세요.',
+    'auth/operation-not-allowed': 'Firebase에서 이메일/비밀번호 로그인이 꺼져 있어요. Authentication → 로그인 방법에서 사용 설정해 주세요.',
+    'auth/unauthorized-domain': '이 주소가 Firebase 승인된 도메인에 없어요. Authentication → 설정 → 승인된 도메인에 추가해 주세요.',
+  };
+  const authMsg = e => AUTH_ERRORS[e && e.code] || `로그인 중 문제가 생겼어요${e && e.code ? ` (${e.code})` : ''}.`;
+  const renderAccount = () => {
+    const box = $('#account'); if (!box) return;
+    if (!fb.ready) { box.closest('.card').hidden = true; return; }
+    box.closest('.card').hidden = false;
+    if (fb.user) {
+      box.innerHTML = `<p class="small muted">로그인한 계정</p><p class="account-email">${esc(fb.user.email || '')}</p>
+        <p class="sync-note" data-sync-status></p>
+        <button class="btn btn-secondary full" id="logout-btn">로그아웃</button>`;
+    } else {
+      box.innerHTML = `<p class="small muted">로그인하면 폰 · 컴퓨터 · 홈 화면 앱에서 같은 일정과 경비를 봐요. 처음이면 이메일과 비밀번호(6자 이상)를 넣고 <b>회원가입</b>을 눌러 주세요.</p>
+        <form id="login-form" class="login-form" novalidate>
+          <label class="field"><span>이메일</span><input id="login-email" type="email" autocomplete="email" inputmode="email" required></label>
+          <label class="field"><span>비밀번호</span><input id="login-password" type="password" autocomplete="current-password" minlength="6" required></label>
+          <p class="warn" id="login-error" hidden></p>
+          <div class="btn-row login-btns"><button class="btn btn-primary" type="submit" data-mode="login">로그인</button><button class="btn btn-secondary" type="submit" data-mode="signup">회원가입</button></div>
+          <button class="link" type="button" id="reset-btn">비밀번호를 잊었어요</button>
+        </form>
+        <p class="sync-note" data-sync-status></p>`;
+    }
+    setSyncStatus(sync.status);
+  };
+  const initFirebase = () => {
+    if (typeof window.firebase === 'undefined' || !firebase.initializeApp) return false;
+    try {
+      const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
+      fb.auth = app.auth(); fb.db = app.firestore(); fb.ready = true;
+    } catch { return false; }
+    fb.auth.onAuthStateChanged(user => {
+      fb.user = user;
+      attachDoc(user ? 'firebase' : null, user ? fb.db.doc(`users/${user.uid}/trips/current`) : null);
+      renderAccount(); renderTripCard();
+    });
+    renderAccount();
+    return true;
+  };
+  const submitLogin = async (form, mode) => {
+    if (fb.busy) return;
+    const email = form.elements['login-email'].value.trim(), pw = form.elements['login-password'].value;
+    const err = $('#login-error');
+    const show = m => { err.textContent = m; err.hidden = false; };
+    if (!email) return show('이메일을 입력해 주세요.');
+    if (pw.length < 6) return show('비밀번호는 6자 이상이어야 해요.');
+    fb.busy = true; err.hidden = true;
+    $$('#login-form button').forEach(b => { b.disabled = true; });
+    try {
+      if (mode === 'signup') await fb.auth.createUserWithEmailAndPassword(email, pw);
+      else await fb.auth.signInWithEmailAndPassword(email, pw);
+      toast(mode === 'signup' ? '가입했어요' : '로그인했어요', email);
+    } catch (e) { show(authMsg(e)); $$('#login-form button').forEach(b => { b.disabled = false; }); }
+    fb.busy = false;
   };
 
   // data/preset.json이 함께 배포돼 있으면, 일정이 비어 있을 때 그 엑셀을 자동으로 불러온다
@@ -1233,7 +1321,28 @@
   setView(VIEWS.includes(initial) ? initial : 'today');
   window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (VIEWS.includes(v) && v !== state.view) { if ($('#detail').open) $('#detail').close(); setView(v); } });
   setSyncStatus('local');
-  initShared().then(shared => { if (!shared) loadPreset(); });
+  // claude.ai 미리보기면 그 공유 저장소, 아니면 Firebase 로그인을 쓴다
+  initShared().then(shared => { if (shared) return; initFirebase(); loadPreset(); });
+  // e.submitter가 없는 오래된 Safari를 위해 마지막으로 누른 버튼을 기억한다
+  let loginMode = 'login';
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('#login-form [data-mode]'); if (b) loginMode = b.dataset.mode; }, true);
+  document.addEventListener('submit', e => {
+    if (e.target.id !== 'login-form') return;
+    e.preventDefault();
+    const mode = (e.submitter && e.submitter.dataset.mode) || loginMode;
+    loginMode = 'login';
+    submitLogin(e.target, mode);
+  });
+  document.addEventListener('click', async e => {
+    if (e.target.closest('#logout-btn')) { await fb.auth.signOut(); toast('로그아웃했어요', '이 기기에 남은 일정은 그대로 볼 수 있어요'); }
+    if (e.target.closest('#reset-btn')) {
+      const email = ($('#login-email') || {}).value || '';
+      const err = $('#login-error');
+      if (!email.trim()) { err.textContent = '이메일을 먼저 입력해 주세요.'; err.hidden = false; return; }
+      try { await fb.auth.sendPasswordResetEmail(email.trim()); toast('비밀번호 재설정 메일을 보냈어요', email.trim()); }
+      catch (x) { err.textContent = authMsg(x); err.hidden = false; }
+    }
+  });
   loadRates(); loadWeather();
   checkAlerts();
   setInterval(tickCountdown, 1000);
