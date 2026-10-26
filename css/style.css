@@ -355,4 +355,6 @@ details.more[open] summary { margin-bottom: 10px; }
 .account-email { font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
 #account { display: flex; flex-direction: column; gap: 10px; }
 
+.steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-size: 16px; }
+
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

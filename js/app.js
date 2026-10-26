@@ -1316,6 +1316,22 @@
   };
 
   $('#export-btn').addEventListener('click', exportExcel);
+  // 위젯 스크립트를 클립보드로 복사(아이폰에서 Scriptable에 붙여 넣기용)
+  $('#copy-widget').addEventListener('click', async () => {
+    const msg = $('#copy-widget-msg');
+    const show = t => { msg.textContent = t; msg.hidden = false; };
+    const rawUrl = 'https://raw.githubusercontent.com/john31331234-gif/travel/main/widget/trip-widget.js';
+    try {
+      // 클립보드 쓰기는 누른 직후에 해야 하므로 내용을 Promise로 넘긴다(Safari)
+      const text = fetch('widget/trip-widget.js', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); });
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        await navigator.clipboard.write([new ClipboardItem({ 'text/plain': text.then(t => new Blob([t], { type: 'text/plain' })) })]);
+      } else await navigator.clipboard.writeText(await text);
+      show('복사했어요. Scriptable에서 + 를 누르고 붙여 넣어 주세요.');
+    } catch {
+      show(`복사가 안 됐어요. 이 주소를 열어 전체 선택 → 복사해 주세요: ${rawUrl}`);
+    }
+  });
   const VIEWS = ['today', 'schedule', 'budget', 'upload', 'tools', 'settings'];
   const initial = (location.hash || '').slice(1);
   setView(VIEWS.includes(initial) ? initial : 'today');
