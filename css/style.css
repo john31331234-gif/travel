@@ -358,3 +358,118 @@ details.more[open] summary { margin-bottom: 10px; }
 .steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-size: 16px; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* =========================================================
+   여정 지도 테마 (Figma 사용자 여정 지도 · FigJam 스타일)
+   점 격자 바탕 · 구분별 포스트잇 색 · 단계 열 · 컨디션 곡선
+   ========================================================= */
+:root[data-skin="journey"] {
+  --bg-canvas: #F5F5F7; --bg-surface: #FFFFFF; --bg-subtle: #F0F0F3; --ink: #E3E3E8;
+  --text-primary: #1E1E1E; --text-secondary: #5A5A66; --text-tertiary: #9A9AA6;
+  --brand: #7B61FF; --highlight: #EFEBFF; --accent: #F24E1E; --accent-soft: #FFE5DC;
+  --success: #0FA968; --success-soft: #DDF7EA; --warning: #C77700; --warning-soft: #FFF1D6;
+  --font-ko: "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif; --font-hand: "Inter", "Noto Sans KR", system-ui, sans-serif;
+  --r-card: 16px; --r-sm: 10px; --shadow: 0 1px 2px rgba(20,20,40,.06), 0 4px 14px rgba(20,20,40,.06);
+  --line: 1px solid #E3E3E8; --line-thin: 1px solid #E3E3E8;
+  /* 포스트잇 색 */
+  --c-move: #C2E5FF; --c-move-ink: #0B5CAD; --c-food: #FFD9B3; --c-food-ink: #A3470A; --c-sight: #CDF4D3; --c-sight-ink: #12733B;
+  --c-rest: #DCCCFF; --c-rest-ink: #5B3BC4; --c-onsen: #FFC7DE; --c-onsen-ink: #B0245F; --c-prep: #E6E6EC; --c-prep-ink: #4A4A55;
+  --c-free: #FFF1A8; --c-free-ink: #7A6400; --c-etc: #F0F0F3; --c-etc-ink: #4A4A55;
+}
+:root[data-skin="journey"] body {
+  font-size: 16px; letter-spacing: -.01em;
+  background: radial-gradient(circle, #D4D4DC 1px, transparent 1.2px) 0 0 / 22px 22px, var(--bg-canvas);
+}
+:root[data-skin="journey"] .doodle-circle::before, :root[data-skin="journey"] .doodle-underline,
+:root[data-skin="journey"] .doodle-star, :root[data-skin="journey"] .hand-note { display: none !important; }
+:root[data-skin="journey"] .display { font-weight: 800; font-size: 34px; letter-spacing: -.03em; }
+:root[data-skin="journey"] .eyebrow { font-weight: 600; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--brand); }
+:root[data-skin="journey"] .sidebar { background: #fff; border-right: 1px solid #E3E3E8; }
+:root[data-skin="journey"] .brand-mark { background: linear-gradient(135deg, #F24E1E, #A259FF 55%, #1ABCFE); border: 0; }
+:root[data-skin="journey"] .nav-item[aria-current="page"] { background: var(--highlight); color: var(--brand); border-color: transparent; }
+:root[data-skin="journey"] .tabbar { border-top: 1px solid #E3E3E8; background: rgba(255,255,255,.92); backdrop-filter: blur(12px); }
+:root[data-skin="journey"] .tab[aria-current="page"] { color: var(--brand); }
+:root[data-skin="journey"] .tab[aria-current="page"]::after { background: var(--brand); }
+:root[data-skin="journey"] .btn { border: 1px solid #E3E3E8; font-weight: 600; font-size: 16px; }
+:root[data-skin="journey"] .btn-primary { background: #1E1E1E; color: #fff; border-color: #1E1E1E; box-shadow: none; }
+:root[data-skin="journey"] .pill { font-weight: 600; font-size: 15px; }
+:root[data-skin="journey"] .pill[aria-selected="true"], :root[data-skin="journey"] .pill.on { background: #1E1E1E; color: #fff; border-color: transparent; }
+:root[data-skin="journey"] .pills.wrap .pill { border-color: #E3E3E8; }
+:root[data-skin="journey"] .chip { border: 0; font-weight: 600; }
+:root[data-skin="journey"] .card-title { font-size: 17px; font-weight: 700; }
+:root[data-skin="journey"] .toggle, :root[data-skin="journey"] .toggle::after { border-color: #D4D4DC; }
+
+/* 다음 일정 카드: 진행 단계 줄 + 진한 바탕 */
+:root[data-skin="journey"] .hero { background: #1E1E1E; color: #fff; border: 0; position: relative; overflow: hidden; }
+:root[data-skin="journey"] .hero::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 6px; background: linear-gradient(90deg, #F24E1E, #FF7262 20%, #A259FF 45%, #1ABCFE 70%, #0ACF83); }
+:root[data-skin="journey"] .hero .hero-title, :root[data-skin="journey"] .hero .hero-time, :root[data-skin="journey"] .hero .countdown { color: #fff; }
+:root[data-skin="journey"] .hero .hero-place, :root[data-skin="journey"] .hero .muted { color: #C9C9D3; }
+:root[data-skin="journey"] .hero-time { font-weight: 800; font-size: 50px; letter-spacing: -.04em; }
+:root[data-skin="journey"] .countdown { font-family: var(--font-hand); font-weight: 700; font-size: 20px; font-variant-numeric: tabular-nums; }
+:root[data-skin="journey"] .hero .badge { background: rgba(255,255,255,.12); color: #fff; border: 0; }
+:root[data-skin="journey"] .hero-actions .btn { background: #fff !important; color: #1E1E1E !important; border: 0; }
+:root[data-skin="journey"] .hero-actions .btn:last-child { background: rgba(255,255,255,.12) !important; color: #fff !important; }
+:root[data-skin="journey"] .hero.empty { background: #fff; color: var(--text-primary); }
+:root[data-skin="journey"] .hero.empty .hero-title { color: var(--text-primary); }
+
+/* 일정 카드: 왼쪽 시간 칸이 구분 색 포스트잇 */
+:root[data-skin="journey"] .s-card { border: 1px solid #E3E3E8; }
+:root[data-skin="journey"] .s-card.soon { border: 2px solid var(--accent); background: #fff; }
+:root[data-skin="journey"] .s-card.done { box-shadow: none; }
+:root[data-skin="journey"] .s-time { border: 0; border-radius: 8px; background: var(--c-etc); box-shadow: 2px 2px 0 rgba(0,0,0,.06); }
+:root[data-skin="journey"] .s-time b { font-size: 21px; font-weight: 800; color: var(--c-etc-ink); }
+:root[data-skin="journey"] .s-alert, :root[data-skin="journey"] .s-alert svg { color: var(--brand); }
+:root[data-skin="journey"] [data-cat="move"] .s-time { background: var(--c-move); } :root[data-skin="journey"] [data-cat="move"] .s-time b { color: var(--c-move-ink); }
+:root[data-skin="journey"] [data-cat="food"] .s-time { background: var(--c-food); } :root[data-skin="journey"] [data-cat="food"] .s-time b { color: var(--c-food-ink); }
+:root[data-skin="journey"] [data-cat="sight"] .s-time { background: var(--c-sight); } :root[data-skin="journey"] [data-cat="sight"] .s-time b { color: var(--c-sight-ink); }
+:root[data-skin="journey"] [data-cat="rest"] .s-time { background: var(--c-rest); } :root[data-skin="journey"] [data-cat="rest"] .s-time b { color: var(--c-rest-ink); }
+:root[data-skin="journey"] [data-cat="onsen"] .s-time { background: var(--c-onsen); } :root[data-skin="journey"] [data-cat="onsen"] .s-time b { color: var(--c-onsen-ink); }
+:root[data-skin="journey"] [data-cat="prep"] .s-time { background: var(--c-prep); } :root[data-skin="journey"] [data-cat="prep"] .s-time b { color: var(--c-prep-ink); }
+:root[data-skin="journey"] [data-cat="free"] .s-time { background: var(--c-free); } :root[data-skin="journey"] [data-cat="free"] .s-time b { color: var(--c-free-ink); }
+
+/* 위젯 · 경비 */
+:root[data-skin="journey"] .clock { border: 0; } :root[data-skin="journey"] .clock.local { background: var(--highlight); }
+:root[data-skin="journey"] .clock b, :root[data-skin="journey"] .conv input, :root[data-skin="journey"] .stats b, :root[data-skin="journey"] .exp-num > b { font-weight: 800; letter-spacing: -.02em; }
+:root[data-skin="journey"] .quick button { background: var(--highlight); color: var(--brand); border: 0; font-weight: 700; font-size: 16px; }
+:root[data-skin="journey"] .budget-hero .hero-time { font-size: 40px; }
+:root[data-skin="journey"] .stats > div { background: rgba(255,255,255,.1); border: 0; color: #fff; }
+:root[data-skin="journey"] .stats .muted { color: #C9C9D3; } :root[data-skin="journey"] .rate { color: #fff; } :root[data-skin="journey"] .rate span { color: #C9C9D3; }
+:root[data-skin="journey"] .rate input { background: #fff; color: #1E1E1E; border: 0; font-weight: 700; }
+:root[data-skin="journey"] .bar { border: 0; height: 10px; } :root[data-skin="journey"] .bar span { background: linear-gradient(90deg, #A259FF, #1ABCFE); }
+:root[data-skin="journey"] .seg { border-color: #E3E3E8; } :root[data-skin="journey"] .seg.late { border-color: #F24E1E; }
+:root[data-skin="journey"] .day-head { font-weight: 800; letter-spacing: -.02em; }
+
+/* 여정 지도 보드 */
+.journey { background: #fff; border: 1px solid #E3E3E8; border-radius: 16px; box-shadow: var(--shadow); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.j-grid { display: grid; gap: 0; min-width: min-content; }
+.j-grid > * { padding: 10px; border-top: 1px dashed #E3E3E8; }
+.j-grid > :nth-child(-n+99) { min-width: 0; }
+.j-row-label { position: sticky; left: 0; z-index: 2; background: #FAFAFC; font-size: 12px; font-weight: 700; letter-spacing: .04em; color: #5A5A66; border-right: 1px solid #E3E3E8; display: flex; align-items: flex-start; }
+.j-stage { font-weight: 800; font-size: 15px; display: flex; align-items: baseline; gap: 6px; border-top: 0; }
+.j-stage small { font-weight: 500; color: #9A9AA6; font-size: 12px; }
+.j-stage { box-shadow: inset 0 4px 0 var(--stage, #A259FF); }
+.j-stage[data-stage="dawn"] { --stage: #1ABCFE; } .j-stage[data-stage="morning"] { --stage: #0ACF83; } .j-stage[data-stage="noon"] { --stage: #FF7262; }
+.j-stage[data-stage="afternoon"] { --stage: #F2C94C; } .j-stage[data-stage="evening"] { --stage: #A259FF; } .j-stage[data-stage="night"] { --stage: #3D3D8F; }
+.j-grid > .j-row-label:first-child { border-top: 0; }
+.j-cell { display: flex; flex-direction: column; gap: 8px; }
+.j-note { text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 9px 10px 10px; border-radius: 4px 4px 10px 4px; background: var(--c-etc, #F0F0F3); box-shadow: 0 1px 0 rgba(0,0,0,.06), 2px 3px 0 rgba(0,0,0,.05); font-size: 14px; line-height: 1.3; color: #1E1E1E; transform: rotate(-.4deg); }
+.j-note:nth-child(2n) { transform: rotate(.5deg); }
+.j-note b { font-family: "Inter", sans-serif; font-weight: 800; font-size: 13px; color: var(--ink2, #4A4A55); }
+.j-note i { font-style: normal; font-size: 11px; color: var(--ink2, #4A4A55); opacity: .8; }
+.j-note[data-done] { opacity: .5; }
+.j-note[data-cat="move"] { background: var(--c-move, #C2E5FF); --ink2: var(--c-move-ink, #0B5CAD); } .j-note[data-cat="food"] { background: var(--c-food, #FFD9B3); --ink2: var(--c-food-ink, #A3470A); }
+.j-note[data-cat="sight"] { background: var(--c-sight, #CDF4D3); --ink2: var(--c-sight-ink, #12733B); } .j-note[data-cat="rest"] { background: var(--c-rest, #DCCCFF); --ink2: var(--c-rest-ink, #5B3BC4); }
+.j-note[data-cat="onsen"] { background: var(--c-onsen, #FFC7DE); --ink2: var(--c-onsen-ink, #B0245F); } .j-note[data-cat="prep"] { background: var(--c-prep, #E6E6EC); --ink2: var(--c-prep-ink, #4A4A55); }
+.j-note[data-cat="free"] { background: var(--c-free, #FFF1A8); --ink2: var(--c-free-ink, #7A6400); }
+.j-curve { position: relative; height: 92px; padding: 0 !important; }
+.j-curve svg { position: absolute; left: 0; right: 0; top: 16px; width: 100%; height: calc(100% - 32px); overflow: visible; }
+.j-line { fill: none; stroke: #A259FF; stroke-width: 3; stroke-linecap: round; }
+.j-face { position: absolute; transform: translate(-50%, -50%); font-size: 22px; line-height: 1; background: #fff; border-radius: 50%; padding: 3px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.j-pain { background: #FFE5DC; border-left: 4px solid #F24E1E; border-radius: 4px 8px 8px 4px; padding: 7px 9px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
+.j-pain[data-level="tight"] { background: #FFF1D6; border-left-color: #F2A100; }
+.j-pain b { font-size: 13px; } .j-pain span { color: #5A5A66; line-height: 1.35; }
+.j-opps { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border-top: 1px solid #E3E3E8; background: #FAFAFC; align-items: flex-start; }
+.j-opps .j-row-label { background: none; border: 0; position: static; width: 100%; padding: 0; }
+.j-opp { flex: 1 1 220px; background: #DDF7EA; border-left: 4px solid #0ACF83; border-radius: 4px 8px 8px 4px; padding: 7px 9px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
+.j-opp span { color: #33503F; line-height: 1.35; }
+@media (max-width: 600px) { .journey { --jl: 58px; --jc: 140px; } .j-row-label { font-size: 11px; padding: 10px 6px !important; } .j-stage { font-size: 14px; flex-wrap: wrap; } }

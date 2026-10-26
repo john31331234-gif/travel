@@ -39,7 +39,7 @@
 
   const state = {
     items: store.get('items', []),
-    settings: Object.assign({ city: 'paris', lead: 10, notify: false, sound: true, tripName: '', startDate: '' }, store.get('settings', {})),
+    settings: Object.assign({ city: 'paris', lead: 10, notify: false, sound: true, tripName: '', startDate: '', skin: 'journey' }, store.get('settings', {})),
     fired: store.get('fired', {}),
     snooze: store.get('snooze', {}),
     checks: store.get('checks', null) || DEFAULT_CHECKS.map((t, i) => ({ id: 'c' + i, text: t, done: false })),
@@ -382,12 +382,14 @@
     </div>`;
   };
 
+  // 일정 구분 → 색(여정 지도 테마의 포스트잇 색)
+  const catKey = c => { c = String(c || ''); return /이동|교통|비행|열차|버스|공항/.test(c) ? 'move' : /식사|아침|점심|저녁|카페/.test(c) ? 'food' : /관광|구경|투어|체험/.test(c) ? 'sight' : /온천|스파/.test(c) ? 'onsen' : /휴식|숙소|호텔/.test(c) ? 'rest' : /준비|수속|체크/.test(c) ? 'prep' : /여유|자유/.test(c) ? 'free' : c ? 'etc' : 'none'; };
   const cardHtml = (it, now) => {
     const st = statusOf(it, now);
     const tr = transportFor(it);
     const chip = (st === 'done' ? '<span class="chip done">완료</span>' : st === 'now' ? '<span class="chip soon">진행 중</span>' : st === 'soon' ? '<span class="chip soon">곧 시작</span>' : '')
       + (tr && tr.level !== 'ok' && st !== 'done' ? `<span class="${LEVEL[tr.level][0]}">${LEVEL[tr.level][1]}</span>` : '');
-    return `<button class="s-card ${st === 'done' ? 'done' : ''} ${st === 'soon' || st === 'now' ? 'soon' : ''}" data-open="${esc(it.id)}">
+    return `<button class="s-card ${st === 'done' ? 'done' : ''} ${st === 'soon' || st === 'now' ? 'soon' : ''}" data-cat="${catKey(it.category)}" data-open="${esc(it.id)}">
       <span class="s-time"><b>${it.time}</b><span>${fmtDur(it.duration) || '&nbsp;'}</span></span>
       <span class="s-body">
         <span class="s-title"><span>${esc(it.title)}</span>${chip}</span>
@@ -468,6 +470,34 @@
     el.textContent = fmtLeft(left);
   };
 
+  // ---------- 여정 지도 (여정 지도 테마의 일정 탭) ----------
+  // 하루를 시간대 단계로 나누고, 단계마다 일정(포스트잇) · 컨디션 곡선 · 문제점 · 개선 기회를 쌓는다.
+  const STAGES = [['dawn', '새벽 · 아침', 0, 9], ['morning', '오전', 9, 12], ['noon', '점심', 12, 14], ['afternoon', '오후', 14, 18], ['evening', '저녁', 18, 21], ['night', '밤', 21, 24]];
+  const FACE = ['😟', '😐', '🙂', '😊'];
+  const scoreOf = it => { const tr = transportFor(it); if (tr && tr.level === 'late') return 0; if (tr && tr.level === 'tight') return 1; return /food|onsen|rest/.test(catKey(it.category)) ? 3 : 2; };
+  const journeyDay = (d, n, now) => {
+    const items = state.items.filter(it => it.date === d);
+    const hourOf = it => +it.time.slice(0, 2);
+    const cols = STAGES.map(([key, label, a, b]) => ({ key, label, items: items.filter(it => hourOf(it) >= a && hourOf(it) < b) })).filter(c => c.items.length);
+    if (!cols.length) return '';
+    const segs = (state.extras && state.extras.transport ? state.extras.transport.segs : []).filter(sg => parseInt(sg.day, 10) === n && sg.level !== 'ok');
+    const segStage = sg => { const m = String(sg.plan).match(/(\d{1,2}):\d{2}/); const h = m ? +m[1] : -1; const st = STAGES.find(([, , a, b]) => h >= a && h < b); return st ? st[0] : null; };
+    const review = state.extras && state.extras.review ? state.extras.review.items.filter(r => parseInt(r.day, 10) === n) : [];
+    // 컨디션 곡선: 단계마다 일정 점수 평균(0~3). 지연·빠듯이 있으면 가장 나쁜 점수를 쓴다
+    const W = 100, H = 56, pts = cols.map((c, i) => { const sc = c.items.map(scoreOf); const v = Math.min(...sc) <= 1 ? Math.min(...sc) : sc.reduce((x, y) => x + y, 0) / sc.length; return { x: (i + 0.5) * W, y: 8 + (3 - v) / 3 * (H - 16), v }; });
+    const path = pts.map((p, i) => { if (!i) return `M${p.x},${p.y}`; const q = pts[i - 1], mx = (q.x + p.x) / 2; return `C${mx},${q.y} ${mx},${p.y} ${p.x},${p.y}`; }).join(' ');
+    const grid = `style="grid-template-columns:var(--jl, 96px) repeat(${cols.length}, minmax(var(--jc, 150px), 1fr))"`;
+    return `<div class="journey" aria-label="${n}일차 여정 지도"><div class="j-grid" ${grid}>
+      <div class="j-row-label">단계</div>${cols.map(c => `<div class="j-stage" data-stage="${c.key}">${c.label}<small>${c.items.length}개</small></div>`).join('')}
+      <div class="j-row-label">행동</div>${cols.map(c => `<div class="j-cell">${c.items.map(it => { const st = statusOf(it, now); return `<button class="j-note" data-cat="${catKey(it.category)}" data-open="${esc(it.id)}"${st === 'done' ? ' data-done' : ''}><b>${it.time}</b><span>${esc(it.title)}</span>${it.category ? `<i>${esc(it.category)}</i>` : ''}</button>`; }).join('')}</div>`).join('')}
+      <div class="j-row-label">컨디션</div><div class="j-curve" style="grid-column: span ${cols.length}"><svg viewBox="0 0 ${cols.length * W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${path}" class="j-line" vector-effect="non-scaling-stroke"/></svg>
+        ${pts.map((p, i) => `<span class="j-face" style="left:${(i + 0.5) / cols.length * 100}%;top:calc(16px + ${(p.y / H).toFixed(3)} * (100% - 32px))" title="여유도 ${p.v.toFixed(1)} / 3">${FACE[Math.round(p.v)]}</span>`).join('')}</div>
+      <div class="j-row-label">문제점</div>${cols.map(c => `<div class="j-cell">${segs.filter(sg => segStage(sg) === c.key).map(sg => `<div class="j-pain" data-level="${sg.level}"><b>${sg.level === 'late' ? '지연' : '빠듯'} · ${esc(sg.seg)}</b><span>${esc(sg.note || sg.mode)}</span></div>`).join('')}</div>`).join('')}
+    </div>
+    ${review.length ? `<div class="j-opps"><span class="j-row-label">개선 기회</span>${review.map(r => `<div class="j-opp"><b>${esc(r.seg)}</b><span>${esc(r.after)}</span></div>`).join('')}</div>` : ''}
+    </div>`;
+  };
+
   // ---------- 화면: 전체 일정 ----------
   const renderSchedule = () => {
     const now = Date.now(), ds = days();
@@ -475,7 +505,7 @@
       ? `<div class="card empty-note"><p>아직 일정이 없어요. 엑셀을 올리거나 직접 만들어 보세요.</p><div class="btn-row"><button class="btn btn-primary" data-add="">${icon('plus')}직접 만들기</button><button class="btn btn-secondary" data-view="upload">${icon('upload')}엑셀 올리기</button></div></div>`
       : checksHtml() + ds.map((d, i) => `<div class="day-group">
           <div class="day-head">${i + 1}일차 <small>${fmtDate(d)}${d === todayStr() ? ' · 오늘' : ''}</small><button class="link add-day" data-add="${d}" aria-label="${fmtShort(d)}에 일정 추가">${icon('plus')}추가</button></div>
-          <div class="cards">${state.items.filter(it => it.date === d).map(it => cardHtml(it, now)).join('')}</div>
+          ${state.settings.skin === 'journey' ? journeyDay(d, i + 1, now) : `<div class="cards">${state.items.filter(it => it.date === d).map(it => cardHtml(it, now)).join('')}</div>`}
         </div>`).join('');
   };
 
@@ -991,7 +1021,10 @@
   };
 
   // ---------- 설정 ----------
+  const SKINS = [['journey', '여정 지도'], ['sketch', '손그림 노트']];
+  const applySkin = () => { document.documentElement.dataset.skin = state.settings.skin === 'sketch' ? 'sketch' : 'journey'; const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = state.settings.skin === 'sketch' ? '#FFF0A0' : '#FFFFFF'; };
   const renderSettings = () => {
+    $('#skin-pills').innerHTML = SKINS.map(([k, l]) => `<button class="pill ${(state.settings.skin || 'journey') === k ? 'on' : ''}" data-skin="${k}">${l}</button>`).join('');
     $('#t-notify').setAttribute('aria-checked', String(!!state.settings.notify && !notifyBlocker() && Notification.permission === 'granted'));
     $('#t-sound').setAttribute('aria-checked', String(!!state.settings.sound));
     $('#lead-pills').innerHTML = LEADS.map(l => `<button class="pill ${state.settings.lead === l ? 'on' : ''}" data-lead="${l}">${l === 0 ? '정각' : l >= 60 ? l / 60 + '시간 전' : l + '분 전'}</button>`).join('');
@@ -1026,6 +1059,7 @@
     if (t.hasAttribute('data-close')) { $('#detail').close(); return; }
     if (t.hasAttribute('data-sample')) { loadSample(); return; }
     if (t.dataset.day) { state.day = t.dataset.day; renderToday(); return; }
+    if (t.dataset.skin) { state.settings.skin = t.dataset.skin; save(); applySkin(); render(); return; }
     if (t.dataset.lead != null) { state.settings.lead = +t.dataset.lead; save(); render(); return; }
     if (t.dataset.itemLead != null) {
       const it = state.items.find(i => i.id === t.dataset.id);
@@ -1332,6 +1366,7 @@
       show(`복사가 안 됐어요. 이 주소를 열어 전체 선택 → 복사해 주세요: ${rawUrl}`);
     }
   });
+  applySkin();
   const VIEWS = ['today', 'schedule', 'budget', 'upload', 'tools', 'settings'];
   const initial = (location.hash || '').slice(1);
   setView(VIEWS.includes(initial) ? initial : 'today');
