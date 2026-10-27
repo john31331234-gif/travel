@@ -911,11 +911,47 @@
 
   // ---------- 교통 점검 · 검토 결과 ----------
   const LEVEL = { late: ['chip soon', '지연'], tight: ['chip warn', '빠듯'], ok: ['chip done', '여유'] };
-  // 교통 표의 "시간표상 계획"(예: 15:10~16:10 원파이브 텐진 이동)과 일차로 일정을 찾는다
+  // 교통 표의 "시간표상 계획"(예: 15:10~16:10 원파이브 텐진 이동)과 일차로 일정을 찾아 구간마다 일정 id를 붙여 둔다.
+  // 시간이 이미 고쳐진 일정은 계획 글자에 일정 이름이 들어 있는지로 찾는다.
+  const linkSegs = () => {
+    const tr = state.extras && state.extras.transport; if (!tr) return;
+    const ds = days(), used = new Set(tr.segs.map(sg => sg.itemId).filter(Boolean));
+    tr.segs.forEach(sg => {
+      if (sg.itemId !== undefined) return;
+      const date = ds[parseInt(sg.day, 10) - 1], start = parseTime(splitRange(sg.plan)[0]);
+      const list = state.items.filter(i => i.date === date && !used.has(i.id));
+      const label = String(sg.plan).replace(/^[\d:\s~〜–—-]+/, '').trim();
+      const it = list.find(i => i.time === start) || (label && list.find(i => label.includes(i.title) || i.title.includes(label)));
+      if (!it) return;
+      const prev = state.items.filter(i => i.date === date && i.time < it.time).pop();
+      sg.itemId = it.id; used.add(it.id);
+      sg.base = { time: start || it.time, end: parseTime(splitRange(sg.plan)[1]) || it.end || null, prevId: prev ? prev.id : null, prevEnd: prev ? prev.end || null : null };
+    });
+  };
+  // 계획을 고친 만큼 출발 · 도착 목표를 옮겨 여유 시간과 판정을 다시 낸다 (표의 소요 시간은 그대로 쓴다).
+  // 연결된 일정이 지워졌거나 다른 날로 옮겨졌으면 null.
+  const liveSeg = sg => {
+    if (!sg.itemId || !sg.base || isNaN(sg.slack) || !/^\d{2}:\d{2}$/.test(sg.dep) || !/^\d{2}:\d{2}$/.test(sg.arr)) return sg;
+    const it = state.items.find(i => i.id === sg.itemId);
+    if (!it || days().indexOf(it.date) + 1 !== parseInt(sg.day, 10)) return null;
+    const B = sg.base, dep = toMin(sg.dep), target = toMin(sg.arr) + sg.slack;
+    const startShift = toMin(it.time) - toMin(B.time);
+    // 도착 목표는 원래 계획의 시작이나 끝 중 하나에 맞춰져 있다
+    const tShift = target === toMin(B.time) ? startShift : B.end && target === toMin(B.end) ? (it.end ? toMin(it.end) : toMin(B.end) + startShift) - toMin(B.end) : 0;
+    // 출발은 앞 일정이 끝나는 때거나, 이 일정 안의 어느 때다
+    const prev = B.prevId && state.items.find(i => i.id === B.prevId);
+    const dShift = B.prevEnd && dep === toMin(B.prevEnd) ? (prev && prev.end ? toMin(prev.end) - dep : 0) : dep >= toMin(B.time) ? startShift : 0;
+    if (!tShift && !dShift) return sg;
+    const slack = sg.slack + tShift - dShift, level = slack < 0 ? 'late' : slack < 10 ? 'tight' : 'ok';
+    return { ...sg, dep: addMin(sg.dep, dShift), arr: addMin(sg.arr, dShift), slack, level, verdict: LEVEL[level][1], edited: true,
+      note: `고친 계획 기준 여유 ${slack}분${level === 'ok' ? ' · 해결됨' : sg.note ? ' · ' + sg.note : ''}` };
+  };
+  const liveSegs = () => { const tr = state.extras && state.extras.transport; if (!tr) return []; linkSegs(); return tr.segs.map(liveSeg).filter(Boolean); };
   const transportFor = it => {
     const tr = state.extras && state.extras.transport; if (!tr) return null;
-    const n = days().indexOf(it.date) + 1;
-    return tr.segs.find(s => parseInt(s.day, 10) === n && parseTime(splitRange(s.plan)[0]) === it.time) || null;
+    linkSegs();
+    const sg = tr.segs.find(s => s.itemId === it.id);
+    return sg ? liveSeg(sg) : null;
   };
   const segHtml = (s, inDetail) => `<div class="seg ${s.level}">
       <div class="seg-head"><span class="${LEVEL[s.level][0]}">${LEVEL[s.level][1]}</span><b>${esc(s.seg)}</b>${inDetail ? '' : `<span class="muted small">${esc(s.day)}</span>`}</div>
@@ -927,15 +963,16 @@
   const checksHtml = n => {
     const ex = state.extras; if (!ex || (!ex.transport && !ex.review)) return '';
     const ofDay = x => parseInt(x.day, 10) === n;
-    const segs = (ex.transport ? ex.transport.segs : []).filter(ofDay);
+    const segs = liveSegs().filter(ofDay);
     const reviews = (ex.review ? ex.review.items : []).filter(ofDay);
-    const issues = segs.filter(s => s.level !== 'ok');
+    // 계획을 고쳐 풀린 구간도 '해결됨'으로 남겨 보여 준다
+    const issues = segs.filter(s => s.level !== 'ok' || s.edited);
     const cnt = k => segs.filter(s => s.level === k).length;
     const mini = s => `<li class="mini ${s.level}"><b><span class="${LEVEL[s.level][0]}">${LEVEL[s.level][1]}</span>${esc(s.seg)}</b>${s.note ? `<span>${esc(s.note)}</span>` : ''}</li>`;
     return `<div class="card checks">
       <h3 class="card-title">${icon('clock')}문제점${segs.length ? `<span class="right small">지연 ${cnt('late')} · 빠듯 ${cnt('tight')}</span>` : ''}</h3>
-      ${issues.length ? `<ul class="minis">${issues.map(mini).join('')}</ul>` : '<p class="muted small">문제 구간이 없어요 👍</p>'}
-      ${segs.length > issues.length ? `<details class="more"><summary>여유 구간 ${segs.length - issues.length}곳</summary><ul class="minis">${segs.filter(s => s.level === 'ok').map(mini).join('')}</ul></details>` : ''}
+      ${issues.length ? `<ul class="minis">${issues.map(mini).join('')}</ul>` : ''}${issues.every(s => s.level === 'ok') ? '<p class="muted small">문제 구간이 없어요 👍</p>' : ''}
+      ${segs.length > issues.length ? `<details class="more"><summary>여유 구간 ${segs.length - issues.length}곳</summary><ul class="minis">${segs.filter(s => !issues.includes(s)).map(mini).join('')}</ul></details>` : ''}
       ${reviews.length ? `<details class="more"><summary>수정안 ${reviews.length}건</summary><ul class="minis">${reviews.map(r => `<li class="mini fix"><b>${esc(r.seg)}</b><span>${esc(r.after)}</span></li>`).join('')}</ul></details>` : ''}
     </div>`;
   };
