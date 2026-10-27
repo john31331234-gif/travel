@@ -833,6 +833,8 @@
     if (!it && matchMedia('(min-width: 960px)').matches) $('#ed-title').focus();
   };
 
+  // 시트를 연 뒤 하나라도 바꿨는지
+  const editorDirty = f => [...f.elements].some(el => el.name && (el.type === 'checkbox' ? el.checked !== el.defaultChecked : el.tagName === 'SELECT' ? [...el.options].some(o => o.selected !== o.defaultSelected) : el.value !== el.defaultValue));
   // 편집 시트 안의 버튼들: 날짜 · 시간 · 구분 고르기
   const editorClick = t => {
     const f = $('#edit-form'); if (!f || !f.contains(t)) return false;
@@ -1200,7 +1202,10 @@
     clearTimeout(clearArmed); clearArmed = null; btn.textContent = '일정 모두 지우기';
     state.items = []; state.extras = null; state.fired = {}; state.snooze = {}; store.set('presetDismissed', true); save(); toast('일정을 지웠어요'); setView('today');
   });
-  $('#detail').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+  // 바깥(빈 공간)을 누르면 닫되, 일정을 쓰는 중에는 실수로 날아가지 않게 닫지 않는다 (X · 저장으로만 닫힘)
+  $('#detail').addEventListener('click', e => { if (e.target === e.currentTarget && !$('#edit-form')) e.currentTarget.close(); });
+  // Esc도 마찬가지: 쓰던 내용이 있으면 닫지 않는다
+  $('#detail').addEventListener('cancel', e => { const f = $('#edit-form'); if (f && editorDirty(f)) { e.preventDefault(); toast('작성 중인 일정이 있어요', '닫으려면 X를 눌러 주세요'); } });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkAlerts(); render(true); } });
 
   // ---------- 시작 ----------
