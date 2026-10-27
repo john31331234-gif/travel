@@ -525,7 +525,7 @@
         const tr = transportFor(it), lv = tr && tr.level !== 'ok' ? tr.level : '', st = statusOf(it, now), dur = s[1] - s[0];
         return `<button class="tt-block${dur < 25 ? ' short' : ''}" data-cat="${catKey(it.category)}" data-open="${esc(it.id)}"${lv ? ` data-level="${lv}"` : ''}${st === 'done' ? ' data-done' : ''}${state.flash === it.id ? ' data-flash' : ''}
           style="--t:${top(s[0])};--h:${dur};--lane:${lane};--of:${of}" title="${it.time}${it.end ? '~' + it.end : ''} ${esc(it.title)}">
-          <small>${it.time}${it.end ? `<i>~${it.end}</i>` : ''}${lv ? `<em>${lv === 'late' ? '지연' : '빠듯'}</em>` : ''}</small><span>${esc(it.title)}</span></button>`;
+          <small>${it.time}${it.end ? `<i>~${it.end}</i>` : ''}${lv ? `<em>${lv === 'late' ? '지연' : '빠듯'}</em>` : ''}</small><span>${esc(it.title)}</span><i class="tt-resize" aria-hidden="true"></i></button>`;
       }).join('');
       const nowLine = d === t ? (() => { const m = toMin(timeIn(now, city().tz)); return m >= startH * 60 && m <= endH * 60 ? `<i class="tt-now" style="--t:${top(m)}"></i>` : ''; })() : '';
       return `<div class="tt-col" data-tt-date="${d}" style="--total:${total}">${blocks}${nowLine}</div>`;
@@ -538,6 +538,83 @@
         <div class="tt-body"><div class="tt-hours" style="--total:${total}">${hours}</div>${ds.map(col).join('')}</div>
       </div>`;
   };
+
+  // ---------- 시간표 끌어서 옮기기 · 아래 끝을 끌어 길이 바꾸기 ----------
+  // 마우스는 바로, 손가락은 0.35초 꾹 누른 뒤 끌기 시작한다(그냥 밀면 화면이 스크롤되도록). 10분 단위로 맞춘다.
+  const ttDrag = { on: null, timer: null, suppress: false };
+  const ttPpm = el => parseFloat(getComputedStyle(el.closest('.timetable')).getPropertyValue('--ppm')) || 1;
+  const ttStartH = el => +getComputedStyle(el.closest('.timetable')).getPropertyValue('--startH') || 0;
+  const ttLabel = (d, a, b) => { const small = $('small', d.block); small.firstChild.textContent = addMin('00:00', a); const i = $('i', small); if (i) i.textContent = '~' + addMin('00:00', b); else small.insertAdjacentHTML('beforeend', `<i>~${addMin('00:00', b)}</i>`); };
+  const ttBegin = d => {
+    ttDrag.on = d; d.started = true;
+    d.block.classList.add('dragging'); d.block.style.setProperty('--lane', 0); d.block.style.setProperty('--of', 1);
+    document.body.classList.add('tt-dragging');
+    if (navigator.vibrate) navigator.vibrate(10);
+  };
+  document.addEventListener('pointerdown', e => {
+    const block = e.target.closest && e.target.closest('.tt-block'); if (!block || e.button > 0) return;
+    const it = state.items.find(i => i.id === block.dataset.open); if (!it) return;
+    const col = block.closest('.tt-col'), ppm = ttPpm(block), base = ttStartH(block) * 60;
+    const a = base + +block.style.getPropertyValue('--t'), dur = +block.style.getPropertyValue('--h');
+    const d = { it, block, col, ppm, base, a, dur, na: a, nb: a + dur, date: it.date, x: e.clientX, y: e.clientY, mode: e.target.classList.contains('tt-resize') ? 'resize' : 'move', touch: e.pointerType !== 'mouse', started: false };
+    ttDrag.pending = d;
+    if (d.touch) ttDrag.timer = setTimeout(() => { if (ttDrag.pending === d) ttBegin(d); }, 350);
+  });
+  document.addEventListener('pointermove', e => {
+    const d = ttDrag.on || ttDrag.pending; if (!d) return;
+    const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (!d.started) {
+      if (Math.hypot(dx, dy) < (d.touch ? 8 : 4)) return;
+      if (d.touch) { clearTimeout(ttDrag.timer); ttDrag.pending = null; return; } // 꾹 누르기 전에 움직이면 스크롤
+      ttBegin(d);
+    }
+    e.preventDefault();
+    const step = Math.round(dy / d.ppm / 10) * 10;
+    if (d.mode === 'resize') {
+      d.nb = Math.max(d.a + 10, d.a + d.dur + step);
+      d.block.style.setProperty('--h', d.nb - d.a);
+      ttLabel(d, d.a, d.nb);
+      return;
+    }
+    d.na = Math.min(Math.max(0, d.a + step), 24 * 60 - 10); d.nb = d.na + d.dur;
+    // 다른 일차 열 위로 가면 그 열로 옮긴다
+    d.block.style.pointerEvents = 'none';
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    d.block.style.pointerEvents = '';
+    const col = under && under.closest && under.closest('.tt-col');
+    if (col && col !== d.block.parentNode) { col.appendChild(d.block); d.date = col.dataset.ttDate; }
+    d.block.style.setProperty('--t', d.na - d.base);
+    ttLabel(d, d.na, d.nb);
+  }, { passive: false });
+  // 손가락으로 끄는 동안에는 화면이 같이 스크롤되지 않게
+  document.addEventListener('touchmove', e => { if (ttDrag.on) e.preventDefault(); }, { passive: false });
+  const ttEnd = () => {
+    clearTimeout(ttDrag.timer);
+    const d = ttDrag.on; ttDrag.pending = null; ttDrag.on = null;
+    document.body.classList.remove('tt-dragging');
+    if (!d) return;
+    ttDrag.suppress = true; setTimeout(() => { ttDrag.suppress = false; }, 50);
+    const it = d.it, moved = d.mode === 'move' ? d.na !== d.a || d.date !== it.date : d.nb !== d.a + d.dur;
+    if (!moved) { renderSchedule(); return; }
+    remember();
+    if (d.mode === 'move') {
+      it.date = d.date; it.time = addMin('00:00', d.na);
+      if (it.end || it.duration) it.end = addMin('00:00', d.nb);
+    } else { it.end = addMin('00:00', d.nb); }
+    if (it.end) it.duration = d.nb - (d.mode === 'move' ? d.na : d.a);
+    state.items.sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
+    delete state.fired[it.id]; delete state.snooze[it.id];
+    const l = leadOf(it); if (l != null && startMs(it) - l * 60000 < Date.now() - 60000) state.fired[it.id] = true;
+    state.flash = it.id;
+    save(); render();
+    toast(d.mode === 'move' ? '일정을 옮겼어요' : '일정 길이를 바꿨어요', `${fmtShort(it.date)} ${it.time}${it.end ? '~' + it.end : ''} · ${it.title}`, null, true);
+  };
+  document.addEventListener('pointerup', ttEnd);
+  document.addEventListener('pointercancel', () => { if (ttDrag.on) { ttDrag.on = null; document.body.classList.remove('tt-dragging'); renderSchedule(); } clearTimeout(ttDrag.timer); ttDrag.pending = null; });
+  // 끌고 난 직후의 클릭(수정 화면 열기)은 무시한다
+  document.addEventListener('click', e => { if (ttDrag.suppress && e.target.closest && e.target.closest('.tt-block, .tt-col')) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+  // 꾹 누를 때 뜨는 길게 누르기 메뉴 · 글자 선택 막기
+  document.addEventListener('contextmenu', e => { if (e.target.closest && e.target.closest('.tt-block')) e.preventDefault(); });
 
   // ---------- 화면: 전체 일정 ----------
   const renderSchedule = () => {

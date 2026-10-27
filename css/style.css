@@ -590,3 +590,12 @@ details.more[open] summary { margin-bottom: 10px; }
   .tt-block em { font-size: 0; width: 8px; height: 8px; padding: 0; }
   .tt-block.short small { display: none; }
 }
+
+/* 시간표 끌어서 옮기기 · 길이 바꾸기 */
+.tt-block { cursor: grab; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.tt-resize { position: absolute; left: 0; right: 0; bottom: 0; height: 9px; cursor: ns-resize; }
+.tt-resize::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 26px; height: 3px; margin-left: -13px; border-radius: 2px; background: rgba(0,0,0,.28); opacity: 0; transition: opacity .15s; }
+.tt-block:hover .tt-resize::after, .tt-block.dragging .tt-resize::after { opacity: 1; }
+@media (hover: none) { .tt-resize { height: 14px; } .tt-resize::after { opacity: .6; } }
+.tt-block.dragging { z-index: 10; opacity: .92; cursor: grabbing; box-shadow: 0 10px 24px rgba(0,0,0,.22), inset 0 0 0 2px #1E1E1E !important; transform: scale(1.02); animation: none; }
+body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user-select: none; user-select: none; }
