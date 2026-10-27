@@ -5,21 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#FFF0A0">
   <meta name="description" content="엑셀로 여행 일정을 올리면 정해진 시간마다 알려 주는 여행 도우미">
-  <title>트립알림</title>
+  <title>핑트립 PingTrip</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Gaegu:wght@400;700&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=32">
+  <link rel="stylesheet" href="css/style.css?v=33">
 </head>
 <body>
   <div class="app">
     <aside class="sidebar" aria-label="메뉴">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#i-plane"/></svg></span>
-        <span class="brand-name">트립알림</span>
+        <img class="brand-mark brand-img" src="icons/icon.svg" alt="" aria-hidden="true">
+        <span class="brand-name">핑트립</span>
       </div>
       <nav class="side-nav">
         <button class="nav-item" data-view="today"><svg><use href="#i-dash"/></svg>오늘 일정</button>
@@ -194,9 +194,9 @@
             <p class="muted small">홈 화면 · 잠금 화면에 다음 일정과 남은 시간을 보여 줘요. 로그인한 계정의 일정을 읽어요.</p>
             <ol class="steps">
               <li>앱스토어에서 무료 앱 <b>Scriptable</b>을 설치해요.</li>
-              <li>아래 <b>스크립트 복사</b>를 누르고, Scriptable 오른쪽 위 <b>+</b> → 붙여 넣기 → 이름을 <b>트립알림</b>으로 바꿔요.</li>
+              <li>아래 <b>스크립트 복사</b>를 누르고, Scriptable 오른쪽 위 <b>+</b> → 붙여 넣기 → 이름을 <b>핑트립</b>으로 바꿔요.</li>
               <li>▶ 실행 → 이 사이트와 같은 이메일 · 비밀번호를 입력해요.</li>
-              <li>홈 화면을 길게 누르기 → <b>+</b> → Scriptable → 크기 선택 → 위젯을 눌러 Script를 <b>트립알림</b>으로 골라요. Parameter에 <b>ticket</b>을 쓰면 보딩패스 색이에요.</li>
+              <li>홈 화면을 길게 누르기 → <b>+</b> → Scriptable → 크기 선택 → 위젯을 눌러 Script를 <b>핑트립</b>으로 골라요. Parameter에 <b>ticket</b>을 쓰면 보딩패스 색이에요.</li>
             </ol>
             <button class="btn btn-secondary full" id="copy-widget"><svg><use href="#i-sheet"/></svg>스크립트 복사</button>
             <p class="small muted" id="copy-widget-msg" hidden></p>
@@ -246,6 +246,6 @@
   <script src="vendor/firebase/firebase-app-compat.js"></script>
   <script src="vendor/firebase/firebase-auth-compat.js"></script>
   <script src="vendor/firebase/firebase-firestore-compat.js"></script>
-  <script src="js/app.js?v=32"></script>
+  <script src="js/app.js?v=33"></script>
 </body>
 </html>

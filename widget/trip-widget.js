@@ -1,8 +1,8 @@
-// 트립알림 위젯 — Scriptable(iOS) 스크립트
+// 핑트립 위젯 — Scriptable(iOS) 스크립트
 // 사이트(https://john31331234-gif.github.io/travel/)에 로그인한 계정의 일정을 읽어 홈 화면 · 잠금 화면 위젯으로 보여 줍니다.
 //
-// 설치: Scriptable 앱 → + → 이 파일 내용을 모두 붙여 넣기 → 이름 "트립알림" → ▶ 실행 → 사이트와 같은 이메일 · 비밀번호 입력
-// 위젯: 홈 화면 길게 누르기 → + → Scriptable → 크기 선택 → 위젯 편집 → Script: 트립알림
+// 설치: Scriptable 앱 → + → 이 파일 내용을 모두 붙여 넣기 → 이름 "핑트립" → ▶ 실행 → 사이트와 같은 이메일 · 비밀번호 입력
+// 위젯: 홈 화면 길게 누르기 → + → Scriptable → 크기 선택 → 위젯 편집 → Script: 핑트립
 //       Parameter 칸에 "ticket"을 쓰면 보딩패스(노랑 · 검정) 테마로 보여요.
 
 const SITE_URL = 'https://john31331234-gif.github.io/travel/';
@@ -70,7 +70,7 @@ function buildView(trip, now) {
   else if (today < days[0]) label = `출발까지 ${Math.max(1, Math.round((zonedToEpoch(days[0], '00:00', tz) - now) / 86400000))}일`;
   else label = '여행 끝';
   return {
-    tripName: trip.tripName || '트립알림', label, today,
+    tripName: trip.tripName || '핑트립', label, today,
     focus: focus && { ...focus, isNow: focus === current, flag: flagOf(focus), dateLabel: focus.date === today ? '' : shortDate(focus.date), endTime: hhmm(focus.end) },
     now: current && current !== focus ? { title: current.title, endTime: hhmm(current.end) } : null,
     upcoming: upcoming.map(i => ({ ...i, flag: flagOf(i), isToday: i.date === today, dateLabel: shortDate(i.date) })),
@@ -187,7 +187,7 @@ function makeWidget(v, family, th, stale) {
   if (inline || rect || circ) {
     // 잠금 화면 위젯은 시스템 색을 따른다
     const f = v.focus;
-    if (!f) { addText(w, inline ? '트립알림 · 남은 일정 없음' : '남은 일정 없음', 12, Color.white(), 'semibold'); return w; }
+    if (!f) { addText(w, inline ? '핑트립 · 남은 일정 없음' : '남은 일정 없음', 12, Color.white(), 'semibold'); return w; }
     if (circ) { addText(w, f.time, 13, Color.white(), 'bold'); addText(w, f.title, 9, Color.white(), 'semibold'); return w; }
     if (inline) { addText(w, `${f.time} ${f.title}`, 12, Color.white(), 'semibold'); return w; }
     addText(w, `${f.isNow ? '진행 중' : '다음'} · ${v.label}`, 11, Color.white(), 'semibold');
@@ -255,7 +255,7 @@ function listRows(parent, items, th, size) {
 
 function messageWidget(title, body, th) {
   const w = new ListWidget(); w.backgroundColor = th.bg; w.url = SITE_URL; w.setPadding(14, 14, 14, 14);
-  addText(w, '트립알림', 11, th.accent, 'semibold'); w.addSpacer(4);
+  addText(w, '핑트립', 11, th.accent, 'semibold'); w.addSpacer(4);
   addText(w, title, 14, th.text, 'bold', 2); w.addSpacer(2);
   addText(w, body, 11, th.sub, 'regular', 4);
   return w;
@@ -264,7 +264,7 @@ function messageWidget(title, body, th) {
 // ---------- 앱에서 실행했을 때: 로그인 · 미리보기 ----------
 async function askLogin() {
   const a = new Alert();
-  a.title = '트립알림 로그인';
+  a.title = '핑트립 로그인';
   a.message = '사이트에서 쓰는 이메일과 비밀번호를 입력해 주세요. 이 아이폰의 키체인에만 저장돼요.';
   const old = readKey(KEY_CRED);
   a.addTextField('이메일', old ? old.email : '');
@@ -284,7 +284,7 @@ async function main() {
   if (config.runsInApp) {
     if (!Keychain.contains(KEY_CRED)) { if (!(await askLogin())) return; }
     const m = new Alert();
-    m.title = '트립알림 위젯';
+    m.title = '핑트립 위젯';
     m.addAction('미리보기 · 작게'); m.addAction('미리보기 · 중간'); m.addAction('미리보기 · 크게'); m.addAction('계정 다시 입력'); m.addCancelAction('닫기');
     const pick = await m.present();
     if (pick === 3) { await askLogin(); return; }

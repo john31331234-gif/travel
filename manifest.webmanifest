@@ -1,6 +1,6 @@
 {
-  "name": "트립알림 — 여행 일정 알림",
-  "short_name": "트립알림",
+  "name": "핑트립 PingTrip — 여행 일정 알림",
+  "short_name": "핑트립",
   "description": "엑셀로 여행 일정을 올리면 정해진 시간마다 알려 주는 여행 도우미",
   "lang": "ko",
   "start_url": "./#today",

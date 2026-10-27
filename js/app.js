@@ -1,4 +1,4 @@
-/* 트립알림 — 엑셀 여행 일정 + 시간 알림 + 여행 도구.
+/* 핑트립(PingTrip) — 엑셀 여행 일정 + 시간 알림 + 여행 도구.
  * 서버 없이 브라우저에서만 동작하고, 데이터는 localStorage에 저장한다. */
 (() => {
   'use strict';
@@ -910,7 +910,7 @@
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 22 }, { wch: 34 }, { wch: 22 }, { wch: 10 }];
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '일정');
-    XLSX.writeFile(wb, '트립알림_일정_양식.xlsx');
+    XLSX.writeFile(wb, '핑트립_일정_양식.xlsx');
   };
 
   const loadSample = () => {
@@ -1144,7 +1144,7 @@
       const brow = [['일차', '구분', '항목', '단가', '통화', '수량', '예산 (원)', '실제 지출 (원)', '메모', '지도']].concat(b.lines.map(l => [l.day, l.cat, l.name, l.unit, l.cur, l.qty, Math.round(lineKrw(l, b)), l.actual || '', l.memo, l.link]));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(brow), '여행경비');
     }
-    XLSX.writeFile(wb, `${(state.settings.tripName || '트립알림').replace(/[\\/:*?"<>|]/g, '')}_일정.xlsx`);
+    XLSX.writeFile(wb, `${(state.settings.tripName || '핑트립').replace(/[\\/:*?"<>|]/g, '')}_일정.xlsx`);
   };
 
   // ---------- 교통 점검 · 검토 결과 ----------
@@ -1407,7 +1407,7 @@
       ? { title: '홈 화면에 추가해야 알림을 켤 수 있어요', body: '아이폰은 Safari 공유 버튼 → 홈 화면에 추가 → 그 아이콘으로 열어 주세요 (iOS 16.4 이상). 지금은 화면 알림과 소리만 울려요.' }
       : { title: '이 브라우저는 시스템 알림을 지원하지 않아요', body: '페이지를 열어 두면 화면 알림과 소리로 알려 드려요.' };
     if (Notification.permission === 'denied') return isIOS
-      ? { title: '알림이 꺼져 있어요', body: '아이폰 설정 앱 → 알림 → 트립알림 → 알림 허용을 켜 주세요.' }
+      ? { title: '알림이 꺼져 있어요', body: '아이폰 설정 앱 → 알림 → 핑트립 → 알림 허용을 켜 주세요.' }
       : { title: '브라우저에서 알림이 막혀 있어요', body: '주소창 왼쪽 아이콘 → 사이트 설정(권한) → 알림 → 허용으로 바꾼 뒤 새로고침해 주세요.' };
     return null;
   };
