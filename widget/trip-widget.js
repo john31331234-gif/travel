@@ -34,10 +34,6 @@ const dateIn = (ms, tz) => { const p = partsIn(ms, tz); return `${p.y}-${pad(p.m
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
 const shortDate = d => { const [, m, dd] = d.split('-').map(Number); return `${m}.${dd} (${WEEK[new Date(d + 'T12:00:00Z').getUTCDay()]})`; };
 
-// 사이트와 같은 구분 → 색 띠
-const catKey = c => { c = String(c || ''); return /이동|교통|비행|열차|버스|공항/.test(c) ? 'move' : /식사|아침|점심|저녁|카페/.test(c) ? 'food' : /관광|구경|투어|체험/.test(c) ? 'sight' : /온천|스파/.test(c) ? 'onsen' : /휴식|숙소|호텔/.test(c) ? 'rest' : /준비|수속|체크/.test(c) ? 'prep' : /여유|자유/.test(c) ? 'free' : 'etc'; };
-const CAT_COLOR = { move: '#2F80ED', food: '#F2994A', sight: '#27AE60', rest: '#7B61FF', onsen: '#E0457B', prep: '#8A8A96', free: '#D9A800', etc: '#8A8A96' };
-
 // 위젯에 보여 줄 내용을 계산한다(그리기와 분리해서 테스트할 수 있게)
 function buildView(trip, now) {
   const tz = TZ[trip.city] || 'Asia/Seoul';
@@ -75,9 +71,9 @@ function buildView(trip, now) {
   else label = '여행 끝';
   return {
     tripName: trip.tripName || '핑트립', label, today,
-    focus: focus && { ...focus, cat: catKey(focus.category), isNow: focus === current, flag: flagOf(focus), dateLabel: focus.date === today ? '' : shortDate(focus.date), endTime: hhmm(focus.end) },
+    focus: focus && { ...focus, isNow: focus === current, flag: flagOf(focus), dateLabel: focus.date === today ? '' : shortDate(focus.date), endTime: hhmm(focus.end) },
     now: current && current !== focus ? { title: current.title, endTime: hhmm(current.end) } : null,
-    upcoming: upcoming.map(i => ({ ...i, cat: catKey(i.category), flag: flagOf(i), isToday: i.date === today, dateLabel: shortDate(i.date) })),
+    upcoming: upcoming.map(i => ({ ...i, flag: flagOf(i), isToday: i.date === today, dateLabel: shortDate(i.date) })),
     budget,
     refreshAt: Math.min(...[now + 30 * 60000, focus ? focus.start : Infinity, focus ? focus.end : Infinity].filter(t => t > now)),
   };
@@ -143,11 +139,14 @@ async function loadTrip() {
 }
 
 // ---------- 그리기 ----------
-// 기본은 핑트립 테마: 보라 → 코랄 그라데이션 카드 + 구분 색 띠. Parameter로 clean · ticket도 고를 수 있다.
+// 기본은 핑트립 테마: 보라 계열 한 가지 색으로 맞춘 카드 · 시간 · 예산. Parameter로 clean · ticket도 고를 수 있다.
 const grad = (colors, from, to) => { const g = new LinearGradient(); g.colors = colors.map(c => new Color(c)); g.locations = colors.map((_, i) => i / (colors.length - 1)); g.startPoint = new Point(from[0], from[1]); g.endPoint = new Point(to[0], to[1]); return g; };
 const THEMES = {
-  ping: { bg: Color.dynamic(new Color('#FFFFFF'), new Color('#16141F')), hero: () => grad(['#7B61FF', '#C64CFF', '#FF7A45'], [0, 0], [1, 1]), heroText: Color.white(), heroSub: new Color('#FFFFFF', 0.78), pill: new Color('#FFFFFF', 0.22),
-    text: Color.dynamic(new Color('#16161D'), new Color('#F4F2FA')), sub: Color.dynamic(new Color('#6E6A80'), new Color('#A39DB8')), accent: new Color('#9B55FF'), warn: new Color('#F24E1E'), tight: new Color('#E08A00'), line: Color.dynamic(new Color('#EFEDF5'), new Color('#2A2638')) },
+  ping: { bg: Color.dynamic(new Color('#FFFFFF'), new Color('#16141F')), hero: () => grad(['#6A5CFF', '#9257FF'], [0, 0], [1, 1]), heroText: Color.white(), heroSub: new Color('#FFFFFF', 0.75), pill: new Color('#FFFFFF', 0.2),
+    text: Color.dynamic(new Color('#1B1830'), new Color('#F4F2FA')), sub: Color.dynamic(new Color('#77728C'), new Color('#A39DB8')), accent: Color.dynamic(new Color('#6A5CFF'), new Color('#A99BFF')),
+    warn: Color.dynamic(new Color('#D9480F'), new Color('#FF8A65')), tight: Color.dynamic(new Color('#B26B00'), new Color('#FFC266')),
+    warnBg: Color.dynamic(new Color('#FFEDE6'), new Color('#3A221C')), tightBg: Color.dynamic(new Color('#FFF4DC'), new Color('#3A3018')),
+    line: Color.dynamic(new Color('#F3F0FF'), new Color('#252036')), lineText: Color.dynamic(new Color('#6A5CFF'), new Color('#C9C0FF')) },
   clean: { bg: Color.dynamic(new Color('#FFFFFF'), new Color('#1C1C1E')), hero: null, heroText: Color.dynamic(new Color('#191F28'), new Color('#F2F2F7')), heroSub: Color.dynamic(new Color('#6B7684'), new Color('#9E9EA6')), pill: Color.dynamic(new Color('#F2F4F6'), new Color('#2C2C2E')),
     text: Color.dynamic(new Color('#191F28'), new Color('#F2F2F7')), sub: Color.dynamic(new Color('#6B7684'), new Color('#9E9EA6')), accent: new Color('#3182F6'), warn: new Color('#F04452'), tight: new Color('#E8A100'), line: Color.dynamic(new Color('#F2F4F6'), new Color('#2C2C2E')) },
   ticket: { bg: new Color('#0F1217'), hero: () => grad(['#FFB020', '#FFB020'], [0, 0], [1, 1]), heroText: new Color('#14161B'), heroSub: new Color('#14161B', 0.7), pill: new Color('#14161B', 0.12),
@@ -169,10 +168,13 @@ function chip(stack, str, bg, color, size) {
   addText(c, str, size, color, 'bold');
   return c;
 }
-function flagChip(stack, flag, th, size) {
+function flagChip(stack, flag, th, size, onHero) {
   if (!flag) return;
   stack.addSpacer(5);
-  chip(stack, flag, flag === '지연' ? th.warn : th.tight, Color.white(), size);
+  const late = flag === '지연';
+  if (onHero) chip(stack, flag, th.pill, th.heroText, size);
+  else if (th.warnBg) chip(stack, flag, late ? th.warnBg : th.tightBg, late ? th.warn : th.tight, size);
+  else chip(stack, flag, late ? th.warn : th.tight, Color.white(), size);
 }
 function logo(stack, color, size) {
   const ic = stack.addImage(SFSymbol.named('mappin.and.ellipse').image); ic.imageSize = new Size(size, size); ic.tintColor = color;
@@ -185,7 +187,7 @@ function heroCard(parent, v, th, family, fill) {
   if (th.hero && !fill) { box.backgroundGradient = th.hero(); box.cornerRadius = 18; box.setPadding(12, 12, 12, 12); }
   const top = box.addStack(); top.centerAlignContent();
   addText(top, f.isNow ? '지금 진행 중' : f.dateLabel ? `다음 · ${f.dateLabel}` : '다음 일정', 11, th.heroSub, 'semibold');
-  flagChip(top, f.flag, th, 10);
+  flagChip(top, f.flag, th, 10, !!th.hero || fill);
   top.addSpacer(); // 카드가 옆으로 꽉 차게
   box.addSpacer(2);
   addText(box, f.time, big, th.heroText, 'heavy');
@@ -198,16 +200,14 @@ function heroCard(parent, v, th, family, fill) {
   return box;
 }
 
-// 이어지는 일정: 구분 색 띠 · 시간 · 이름 · 지연/빠듯
+// 이어지는 일정: 시간 · 이름 · 지연/빠듯 (색은 테마 색 하나로 맞춘다)
 function listRows(parent, items, th, size) {
   let lastDate = null;
   items.forEach((i, idx) => {
     if (!i.isToday && i.date !== lastDate) { addText(parent, i.dateLabel, size - 2, th.sub, 'semibold'); parent.addSpacer(3); }
     lastDate = i.date;
     const r = parent.addStack(); r.centerAlignContent();
-    const bar = r.addStack(); bar.size = new Size(4, size + 6); bar.cornerRadius = 2; bar.backgroundColor = new Color(CAT_COLOR[i.cat] || CAT_COLOR.etc);
-    r.addSpacer(7);
-    addText(r, i.time, size, th.text, 'bold'); r.addSpacer(7);
+    addText(r, i.time, size, th.accent, 'bold'); r.addSpacer(8);
     addText(r, i.title, size, th.text, 'regular');
     flagChip(r, i.flag, th, size - 3);
     r.addSpacer();
@@ -286,8 +286,8 @@ function makeWidget(v, family, th, stale) {
     w.addSpacer();
     if (v.budget) {
       const br = w.addStack(); br.centerAlignContent(); br.backgroundColor = th.line; br.cornerRadius = 10; br.setPadding(7, 10, 7, 10);
-      addText(br, '남은 예산', 11, th.sub, 'semibold'); br.addSpacer();
-      addText(br, '₩' + Math.round(v.budget.left).toLocaleString(), 13, th.text, 'bold');
+      addText(br, '남은 예산', 11, th.lineText || th.sub, 'semibold'); br.addSpacer();
+      addText(br, '₩' + Math.round(v.budget.left).toLocaleString(), 13, th.lineText || th.text, 'bold');
     }
   }
   if (stale) { w.addSpacer(4); addText(w, '오프라인 · 마지막으로 받은 일정', 9, th.sub, 'regular'); }
