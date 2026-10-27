@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Gaegu:wght@400;700&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=9">
+  <link rel="stylesheet" href="css/style.css?v=10">
 </head>
 <body>
   <div class="app">
@@ -71,6 +71,7 @@
             <button class="btn btn-secondary" data-view="upload"><svg><use href="#i-upload"/></svg>엑셀</button>
           </span>
         </header>
+        <div class="pills sched-mode" id="sched-mode" role="tablist" aria-label="보기 방식" hidden></div>
         <div class="pills sched-pills" id="sched-pills" role="tablist" aria-label="일차 선택" hidden></div>
         <div id="schedule-list"></div>
       </section>
@@ -240,6 +241,6 @@
   <script src="vendor/firebase/firebase-app-compat.js"></script>
   <script src="vendor/firebase/firebase-auth-compat.js"></script>
   <script src="vendor/firebase/firebase-firestore-compat.js"></script>
-  <script src="js/app.js?v=9"></script>
+  <script src="js/app.js?v=10"></script>
 </body>
 </html>

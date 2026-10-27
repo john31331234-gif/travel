@@ -501,15 +501,59 @@
     </div>`;
   };
 
+  // ---------- 시간표: 일차를 열로, 시간을 줄로 놓고 일정을 길이만큼 칸으로 그린다 ----------
+  const timetable = (ds, t, now) => {
+    const all = state.items.filter(i => ds.includes(i.date));
+    const span = it => { // 분 단위 시작 · 끝 (끝이 없으면 다음 일정까지, 최대 1시간 · 최소 20분)
+      const a = toMin(it.time);
+      if (it.end) { const e = toMin(it.end); return [a, e > a ? e : e + 1440]; }
+      if (it.duration) return [a, a + it.duration];
+      const nx = all.find(x => x.date === it.date && toMin(x.time) > a);
+      return [a, a + Math.max(20, Math.min(60, nx ? toMin(nx.time) - a : 60))];
+    };
+    const spans = all.map(span);
+    const startH = Math.min(9, ...spans.map(s => Math.floor(s[0] / 60)));
+    const endH = Math.min(26, Math.max(21, ...spans.map(s => Math.ceil(s[1] / 60))));
+    const top = m => m - startH * 60, total = (endH - startH) * 60;
+    const col = (d, n) => {
+      const list = all.filter(i => i.date === d).map(it => ({ it, s: span(it) }));
+      // 겹치는 일정은 옆으로 나눠 놓는다
+      const lanes = [];
+      list.forEach(x => { let k = lanes.findIndex(end => end <= x.s[0]); if (k < 0) { k = lanes.length; lanes.push(0); } lanes[k] = x.s[1]; x.lane = k; });
+      list.forEach(x => { x.of = Math.max(...list.filter(y => y.s[0] < x.s[1] && x.s[0] < y.s[1]).map(y => y.lane)) + 1; });
+      const blocks = list.map(({ it, s, lane, of }) => {
+        const tr = transportFor(it), lv = tr && tr.level !== 'ok' ? tr.level : '', st = statusOf(it, now), dur = s[1] - s[0];
+        return `<button class="tt-block${dur < 25 ? ' short' : ''}" data-cat="${catKey(it.category)}" data-open="${esc(it.id)}"${lv ? ` data-level="${lv}"` : ''}${st === 'done' ? ' data-done' : ''}${state.flash === it.id ? ' data-flash' : ''}
+          style="--t:${top(s[0])};--h:${dur};--lane:${lane};--of:${of}" title="${it.time}${it.end ? '~' + it.end : ''} ${esc(it.title)}">
+          <small>${it.time}${it.end ? `<i>~${it.end}</i>` : ''}${lv ? `<em>${lv === 'late' ? '지연' : '빠듯'}</em>` : ''}</small><span>${esc(it.title)}</span></button>`;
+      }).join('');
+      const nowLine = d === t ? (() => { const m = toMin(timeIn(now, city().tz)); return m >= startH * 60 && m <= endH * 60 ? `<i class="tt-now" style="--t:${top(m)}"></i>` : ''; })() : '';
+      return `<div class="tt-col" data-tt-date="${d}" style="--total:${total}">${blocks}${nowLine}</div>`;
+    };
+    const hours = Array.from({ length: endH - startH }, (_, i) => `<span style="--t:${i * 60}">${(startH + i) % 24}:00</span>`).join('');
+    const segs = liveSegs(), cnt = k => segs.filter(s => s.level === k).length;
+    return `${segs.length ? `<p class="tt-sum"><span class="chip soon">지연 ${cnt('late')}</span><span class="chip warn">빠듯 ${cnt('tight')}</span><span class="muted small">표시된 칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</span></p>` : '<p class="tt-sum muted small">칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</p>'}
+      <div class="timetable" style="--days:${ds.length};--startH:${startH}">
+        <div class="tt-head"><span class="tt-corner">시간</span>${ds.map((d, i) => `<button class="tt-day${d === t ? ' today' : ''}" data-sday="${d}" data-smode-to="board">${i + 1}일차 <small>${fmtShort(d)}</small></button>`).join('')}</div>
+        <div class="tt-body"><div class="tt-hours" style="--total:${total}">${hours}</div>${ds.map(col).join('')}</div>
+      </div>`;
+  };
+
   // ---------- 화면: 전체 일정 ----------
   const renderSchedule = () => {
     const now = Date.now(), ds = days(), t = todayStr();
     const pills = $('#sched-pills');
     pills.hidden = !ds.length;
+    $('#sched-mode').hidden = !ds.length;
     if (!ds.length) {
       $('#schedule-list').innerHTML = `<div class="card empty-note"><p>아직 일정이 없어요. 엑셀을 올리거나 직접 만들어 보세요.</p><div class="btn-row"><button class="btn btn-primary" data-add="">${icon('plus')}직접 만들기</button><button class="btn btn-secondary" data-view="upload">${icon('upload')}엑셀 올리기</button></div></div>`;
       return;
     }
+    // 보기 방식: 시간표(모든 일차를 시간 줄에 나란히) · 일차별(하루씩 여정 지도)
+    const mode = state.settings.schedMode === 'board' ? 'board' : 'table';
+    $('#sched-mode').hidden = false;
+    $('#sched-mode').innerHTML = [['table', '시간표'], ['board', '일차별']].map(([k, l]) => `<button class="pill" role="tab" aria-selected="${k === mode}" data-smode="${k}">${l}</button>`).join('');
+    if (mode === 'table') { pills.hidden = true; $('#schedule-list').innerHTML = timetable(ds, t, now); state.flash = null; return; }
     // 일차 버튼으로 하루씩 본다. 처음엔 오늘(여행 중) 또는 다가오는 날
     if (!state.schedDay || !ds.includes(state.schedDay)) state.schedDay = ds.includes(t) ? t : (ds.find(d => d >= t) || ds[0]);
     const d = state.schedDay, n = ds.indexOf(d) + 1;
@@ -946,7 +990,7 @@
     let dShift = 0;
     if (dep < toMin(B.time) || (B.prevEnd && dep === toMin(B.prevEnd))) {
       if (before && before.id !== B.prevId && catKey(before.category) === 'move' && !linked(before.id)) dShift = toMin(before.time) - dep;
-      else if (before && before.id === B.prevId && before.end) dShift = toMin(before.end) - dep;
+      else if (before && before.id === B.prevId && before.end && B.prevEnd && dep === toMin(B.prevEnd)) dShift = toMin(before.end) - dep;
     } else if (dep >= toMin(B.time)) dShift = startShift;
     if (!tShift && !dShift) return sg;
     const slack = sg.slack + tShift - dShift, level = slack < 0 ? 'late' : slack < 10 ? 'tight' : 'ok';
@@ -1158,6 +1202,14 @@
   };
 
   // ---------- 이벤트 ----------
+  // 시간표의 빈 곳을 누르면 그 날 · 그 시간(10분 단위)으로 새 일정
+  document.addEventListener('click', e => {
+    const c = e.target.classList && e.target.classList.contains('tt-col') ? e.target : null; if (!c) return;
+    const r = c.getBoundingClientRect(), H = +getComputedStyle(c).getPropertyValue('--total');
+    const startH = +getComputedStyle(c.closest('.timetable')).getPropertyValue('--startH');
+    const m = startH * 60 + Math.floor((e.clientY - r.top) / r.height * H / 10) * 10;
+    openEditor(null, c.dataset.ttDate, addMin('00:00', m));
+  });
   document.addEventListener('click', e => {
     const t = e.target.closest('button, a');
     if (!t) return;
@@ -1172,6 +1224,8 @@
     if (t.hasAttribute('data-close')) { $('#detail').close(); return; }
     if (t.hasAttribute('data-sample')) { loadSample(); return; }
     if (t.dataset.day) { state.day = t.dataset.day; renderToday(); return; }
+    if (t.dataset.smode) { state.settings.schedMode = t.dataset.smode; save(); renderSchedule(); return; }
+    if (t.dataset.smodeTo) { state.settings.schedMode = t.dataset.smodeTo; save(); }
     if (t.dataset.sday) { state.schedDay = t.dataset.sday; renderSchedule(); window.scrollTo({ top: 0 }); return; }
     if (t.dataset.skin) { state.settings.skin = t.dataset.skin; save(); applySkin(); render(); return; }
     if (t.dataset.lead != null) { state.settings.lead = +t.dataset.lead; save(); render(); return; }
