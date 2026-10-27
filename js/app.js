@@ -955,6 +955,7 @@
         <label class="field"><span>일정 이름</span><input id="ed-title" name="title" maxlength="60" required value="${v('title')}" placeholder="예: 다자이후 텐만구 참배" autocomplete="off" enterkeyhint="done"></label>
       </div>
       <div class="sheet-body">
+        ${(() => { const tr = it && transportFor(it); return tr && tr.level !== 'ok' ? `<div class="fix-banner ${tr.level}"><span><b>${LEVEL[tr.level][1]} · ${esc(tr.seg)}</b><small>여유 ${tr.slack}분 · 이동 ${tr.mins}분</small></span><button type="button" class="btn btn-sm btn-primary" data-fix-seg="${esc(it.id)}">자동으로 고치기</button></div>` : ''; })()}
         <div class="field"><span>날짜</span>
           <div class="pills wrap ed-chips">${ds.map((x, i) => `<button type="button" class="pill ${x === d ? 'on' : ''}" data-ed-date="${x}">${i + 1}일차 <small>${fmtShort(x)}</small></button>`).join('')}
             <label class="pill ed-date-other ${ds.includes(d) ? '' : 'on'}">${ds.length ? '다른 날' : '날짜'}<input id="ed-date" type="date" name="date" required value="${d}"></label></div>
@@ -1106,7 +1107,10 @@
     const before = state.items.filter(i => i.date === it.date && i.time < it.time).pop();
     const linked = id => state.extras.transport.segs.some(x => x !== sg && x.itemId === id);
     let dShift = 0;
-    if (dep < toMin(B.time) || (B.prevEnd && dep === toMin(B.prevEnd))) {
+    // 시각표대로 출발하는 열차 · 버스는 앞 일정이 바뀌어도 출발 시각이 그대로다
+    const fixedDep = /시각표/.test(sg.basis || '') && !/추정/.test(sg.basis || '');
+    if (fixedDep) dShift = dep >= toMin(B.time) ? startShift : 0;
+    else if (dep < toMin(B.time) || (B.prevEnd && dep === toMin(B.prevEnd))) {
       if (before && before.id !== B.prevId && catKey(before.category) === 'move' && !linked(before.id)) dShift = toMin(before.time) - dep;
       else if (before && before.id === B.prevId && before.end && B.prevEnd && dep === toMin(B.prevEnd)) dShift = toMin(before.end) - dep;
     } else if (dep >= toMin(B.time)) dShift = startShift;
@@ -1116,6 +1120,109 @@
       note: `고친 계획 기준 여유 ${slack}분${level === 'ok' ? ' · 해결됨' : ` · 이동에 ${sg.mins}분 걸려요 → ${addMin(sg.dep, dShift - (10 - slack))}까지 출발하거나 ${it.title} 시작을 ${10 - slack}분 늦추면 해결`}` };
   };
   const liveSegs = () => { const tr = state.extras && state.extras.transport; if (!tr) return []; linkSegs(); return tr.segs.map(liveSeg).filter(Boolean); };
+
+  // ---------- 문제 구간 자동으로 고치기 ----------
+  // 몇 가지 고치는 방법을 10분씩 늘려 가며 시험해 보고, 그 구간이 '여유'(10분 이상)가 되면서
+  // 다른 구간 판정이 나빠지지 않고 일정도 겹치지 않는 가장 작은 변경을 고른다. 고르는 건 사람 몫.
+  const segIssueScore = () => liveSegs().reduce((n, sg) => n + (sg.level === 'late' ? 2 : sg.level === 'tight' ? 1 : 0), 0);
+  const proposeFixes = sgRaw => {
+    const it0 = state.items.find(i => i.id === sgRaw.itemId); if (!it0) return [];
+    const snap = JSON.stringify(state.items), base = segIssueScore(), before = liveSeg(sgRaw);
+    const find = id => state.items.find(i => i.id === id);
+    const day = () => state.items.filter(i => i.date === it0.date).sort((x, y) => toMin(x.time) - toMin(y.time));
+    const prevOf = x => day().filter(i => toMin(i.time) < toMin(x.time)).pop();
+    const nextOf = x => day().find(i => toMin(i.time) > toMin(x.time));
+    const span = x => x.end ? `${x.time}~${x.end}` : x.time;
+    const setEnd = (x, e) => { x.end = e; x.duration = spanOf(x)[1] - spanOf(x)[0]; };
+    const mins = isNaN(sgRaw.mins) ? null : sgRaw.mins;
+    // 줄이는 일정은 원래 길이의 절반 이상(최소 10분)은 남긴다
+    const orig = JSON.parse(snap), keepOk = (x, newDur) => { const o = orig.find(i => i.id === x.id); const od = o ? spanOf(o)[1] - spanOf(o)[0] : 0; return newDur >= Math.max(10, Math.ceil(od / 2)); };
+    const plans = [
+      // 1) 앞 일정을 일찍 끝내고 그 사이에 이동 일정을 넣는다 (이동 시간이 계획에 없을 때)
+      { kind: 'move', label: '앞 일정을 일찍 마치고 이동 시간을 넣기', ok: () => mins && catKey(it0.category) !== 'move' && prevOf(find(it0.id)) && catKey(prevOf(find(it0.id)).category) !== 'move',
+        build: k => { const x = find(it0.id), pv = prevOf(x), ps = spanOf(pv), pe = toMin(x.time) - k;
+          if (!keepOk(pv, pe - ps[0])) return null; const from = span(pv); setEnd(pv, addMin('00:00', pe));
+          const mv = { id: 'u' + Date.now().toString(36) + 'fx', date: x.date, time: pv.end, end: addMin(pv.end, mins), duration: mins, title: sgRaw.seg, place: '', category: '이동', memo: sgRaw.mode || '', mapUrl: '' };
+          state.items.push(mv);
+          return [`${pv.title}: ${from} → ${span(pv)}`, `새 일정 '${mv.title}' ${span(mv)} (이동)`]; } },
+      // 2) 바로 앞 이동 일정을 당긴다
+      { kind: 'early', label: '앞 이동을 일찍 출발하기', ok: () => { const pv = prevOf(find(it0.id)); return pv && catKey(pv.category) === 'move'; },
+        build: k => { const x = find(it0.id), mv = prevOf(x), pp = prevOf(mv); const from = span(mv), fromP = pp && span(pp);
+          mv.time = addMin(mv.time, -k); if (mv.end) mv.end = addMin(mv.end, -k);
+          const out = [`${mv.title}: ${from} → ${span(mv)}`];
+          if (pp && spanOf(pp)[1] > toMin(mv.time)) { if (!keepOk(pp, toMin(mv.time) - spanOf(pp)[0])) return null; setEnd(pp, mv.time); out.push(`${pp.title}: ${fromP} → ${span(pp)}`); }
+          return out; } },
+      // 3) 목적지 일정 시작을 늦춘다 (끝은 그대로)
+      { kind: 'later', label: '도착 후 일정을 늦게 시작하기', ok: () => true,
+        build: k => { const x = find(it0.id), sp = spanOf(x), from = span(x); if (!keepOk(x, sp[1] - sp[0] - k)) return null;
+          x.time = addMin(x.time, k); if (x.end) x.duration = sp[1] - sp[0] - k; return [`${x.title}: ${from} → ${span(x)}`]; } },
+      // 4) 이 일정을 늘리고 다음 일정 시작을 그만큼 늦춘다 (도착이 계획보다 늦을 때)
+      { kind: 'extend', label: '이동 시간을 늘리고 다음 일정을 늦추기', ok: () => !!find(it0.id).end,
+        build: k => { const x = find(it0.id), nx = nextOf(x), from = span(x); setEnd(x, addMin(x.end, k)); const out = [`${x.title}: ${from} → ${span(x)}`];
+          if (nx && spanOf(nx)[0] < spanOf(x)[1]) { const fn = span(nx), ns = spanOf(nx); if (!keepOk(nx, ns[1] - spanOf(x)[1])) return null; nx.time = x.end; if (nx.end) nx.duration = ns[1] - toMin(nx.time); out.push(`${nx.title}: ${fn} → ${span(nx)}`); }
+          return out; } },
+      // 5) 이 일정 끝과 그 뒤 일정을 모두 그만큼 미룬다 (길이는 그대로)
+      { kind: 'shift', label: '이후 일정을 모두 뒤로 미루기', ok: () => !!find(it0.id).end,
+        build: k => { const x = find(it0.id), from = span(x), rest = day().filter(i => toMin(i.time) > toMin(x.time));
+          if (rest.length && spanOf(rest[rest.length - 1])[1] + k > 24 * 60) return null;
+          setEnd(x, addMin(x.end, k)); rest.forEach(i => { i.time = addMin(i.time, k); if (i.end) i.end = addMin(i.end, k); });
+          return [`${x.title}: ${from} → ${span(x)}`].concat(rest.length ? [`그 뒤 일정 ${rest.length}개를 ${k}분씩 늦게 (${rest[0].title} ${rest[0].time} 시작)`] : []); } },
+    ];
+    const found = [];
+    for (const pl of plans) {
+      state.items = JSON.parse(snap);
+      if (!pl.ok()) continue;
+      for (let k = 10; k <= 120; k += 10) {
+        state.items = JSON.parse(snap);
+        const changes = pl.build(k); if (!changes) continue;
+        const after = liveSeg(sgRaw);
+        if (!after || after.level !== 'ok') continue;
+        if (segIssueScore() >= base) continue;
+        if (state.items.some(x => x.date === it0.date && clashOf(x, x.id))) continue;
+        found.push({ kind: pl.kind, label: pl.label, k, changes, slack: after.slack, items: JSON.stringify(state.items) });
+        break;
+      }
+    }
+    state.items = JSON.parse(snap);
+    return { before, options: found.sort((x, y) => x.k - y.k).slice(0, 3) };
+  };
+  let fixState = null;
+  const openFix = itemId => {
+    linkSegs();
+    const sgRaw = state.extras.transport.segs.find(x => x.itemId === itemId); if (!sgRaw) return;
+    const { before, options } = proposeFixes(sgRaw);
+    fixState = { options, pick: 0, itemId };
+    const dlg = $('#detail');
+    dlg.innerHTML = `<div class="sheet-inner fix-sheet">
+      <div class="sheet-hero">
+        <div class="row"><b style="font-size:22px">${options.length ? '이렇게 수정할까요?' : '자동으로 고치기 어려워요'}</b><button type="button" class="icon-btn" data-close aria-label="닫기">${icon('x')}</button></div>
+        <p class="fix-what"><span class="${LEVEL[before.level][0]}">${LEVEL[before.level][1]}</span><b>${esc(before.seg)}</b><span class="muted">지금 여유 ${before.slack}분 · 이동 ${before.mins}분</span></p>
+      </div>
+      <div class="sheet-body">
+        ${options.length ? options.map((o, i) => `<button type="button" class="fix-opt${i === 0 ? ' on' : ''}" data-fix-pick="${i}">
+            <span class="fix-radio"></span><span class="fix-body"><b>${esc(o.label)}${i === 0 ? ' <i>추천</i>' : ''}</b>
+            <ul>${o.changes.map(c => `<li>${esc(c)}</li>`).join('')}</ul>
+            <small>여유 ${before.slack}분 → <strong>${o.slack}분</strong> · 해결</small></span></button>`).join('')
+          : `<p>다른 일정을 건드리지 않고는 여유 10분을 만들 방법을 찾지 못했어요.</p>${before.note ? `<p class="muted small">${esc(before.note)}</p>` : ''}<p class="muted small">일정을 직접 끌어서 옮기거나 수정해 주세요.</p>`}
+      </div>
+      <div class="sheet-cta">
+        <button type="button" class="btn btn-secondary" data-close>${options.length ? '취소' : '닫기'}</button>
+        ${options.length ? `<button type="button" class="btn btn-primary" data-apply-fix>${icon('check')}수정하기</button>` : `<button type="button" class="btn btn-primary" data-edit="${esc(itemId)}">직접 수정</button>`}
+      </div>
+    </div>`;
+    if (!dlg.open) dlg.showModal();
+  };
+  const applyFix = () => {
+    const o = fixState && fixState.options[fixState.pick]; if (!o) return;
+    remember();
+    state.items = JSON.parse(o.items);
+    state.items.sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
+    state.items.forEach(x => { delete state.fired[x.id]; });
+    state.flash = fixState.itemId;
+    save(); $('#detail').close(); render();
+    toast('일정을 고쳤어요', o.changes.join(' · '), null, true);
+    fixState = null;
+  };
   const transportFor = it => {
     const tr = state.extras && state.extras.transport; if (!tr) return null;
     linkSegs();
@@ -1137,7 +1244,7 @@
     // 계획을 고쳐 풀린 구간도 '해결됨'으로 남겨 보여 준다
     const issues = segs.filter(s => s.level !== 'ok' || s.edited);
     const cnt = k => segs.filter(s => s.level === k).length;
-    const mini = s => `<li class="mini ${s.level}"><b><span class="${LEVEL[s.level][0]}">${LEVEL[s.level][1]}</span>${esc(s.seg)}</b>${s.note ? `<span>${esc(s.note)}</span>` : ''}</li>`;
+    const mini = s => `<li class="mini ${s.level}"><b><span class="${LEVEL[s.level][0]}">${LEVEL[s.level][1]}</span>${esc(s.seg)}</b>${s.note ? `<span>${esc(s.note)}</span>` : ''}${s.level !== 'ok' && s.itemId ? `<button class="mini-fix" data-fix-seg="${esc(s.itemId)}">${icon('check')}수정</button>` : ''}</li>`;
     return `<div class="card checks">
       <h3 class="card-title">${icon('clock')}문제점${segs.length ? `<span class="right small">지연 ${cnt('late')} · 빠듯 ${cnt('tight')}</span>` : ''}</h3>
       ${issues.length ? `<ul class="minis">${issues.map(mini).join('')}</ul>` : ''}${issues.every(s => s.level === 'ok') ? '<p class="muted small">문제 구간이 없어요 👍</p>' : ''}
@@ -1333,6 +1440,9 @@
     if (!t) return;
     if (t.dataset.view) { e.preventDefault(); setView(t.dataset.view); return; }
     if (t.hasAttribute('data-fix-overlaps')) { fixOverlaps(); return; }
+    if (t.dataset.fixSeg) { openFix(t.dataset.fixSeg); return; }
+    if (t.dataset.fixPick != null) { fixState.pick = +t.dataset.fixPick; $$('.fix-opt').forEach((b, i) => b.classList.toggle('on', i === fixState.pick)); return; }
+    if (t.hasAttribute('data-apply-fix')) { applyFix(); return; }
     if (editorClick(t)) return;
     if (t.hasAttribute('data-undo')) { t.closest('.toast').remove(); undo(); return; }
     // 전체 일정에서는 포스트잇을 누르면 바로 고칠 수 있게 연다

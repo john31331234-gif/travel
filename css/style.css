@@ -604,3 +604,21 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
 .tt-block.clash:not(.dragging) { box-shadow: inset 0 0 0 2px #F24E1E; background-image: repeating-linear-gradient(135deg, rgba(242,78,30,.12) 0 6px, transparent 6px 12px); }
 .tt-overlap { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 14px; border-radius: 12px; background: #FFF1EC; color: #9A2B0B; font-size: 14px; }
 .tt-overlap svg { width: 18px; height: 18px; flex: none; } .tt-overlap span { flex: 1; } .tt-overlap .btn { flex: none; }
+
+/* 문제 구간 자동으로 고치기 */
+.fix-banner { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #FFF7E6; border: 1px solid #F7D9A0; }
+.fix-banner.late { background: #FFF1EC; border-color: #F8C4B2; }
+.fix-banner > span { flex: 1; display: flex; flex-direction: column; gap: 2px; font-size: 14px; } .fix-banner small { color: var(--text-secondary); }
+.fix-banner .btn { flex: none; min-height: 38px; font-size: 14px; }
+.mini-fix { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 3px 10px; border-radius: 999px; background: #1E1E1E; color: #fff; font-size: 12px; font-weight: 700; }
+.mini-fix svg { width: 13px; height: 13px; }
+.fix-what { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0 0; font-size: 15px; } .fix-what .muted { font-size: 13px; width: 100%; }
+.fix-sheet .sheet-body { gap: 10px; }
+.fix-opt { display: flex; gap: 12px; text-align: left; padding: 14px; border: 1.5px solid #E3E3E8; border-radius: 14px; background: var(--bg-surface); width: 100%; }
+.fix-opt.on { border-color: var(--brand); background: var(--highlight); }
+.fix-radio { flex: none; width: 20px; height: 20px; margin-top: 2px; border-radius: 50%; border: 2px solid #C9C9D2; }
+.fix-opt.on .fix-radio { border: 6px solid var(--brand); }
+.fix-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fix-body b { font-size: 15px; } .fix-body b i { font-style: normal; font-size: 11px; color: #fff; background: var(--brand); padding: 1px 7px; border-radius: 999px; margin-left: 4px; vertical-align: 2px; }
+.fix-body ul { margin: 0; padding-left: 18px; font-size: 14px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 2px; }
+.fix-body small { font-size: 13px; color: var(--text-secondary); } .fix-body strong { color: #12733B; }
