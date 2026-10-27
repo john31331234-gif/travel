@@ -471,7 +471,7 @@
   };
 
   // ---------- 여정 지도 (여정 지도 테마의 일정 탭) ----------
-  // 하루를 시간대 단계로 나누고, 단계마다 일정(포스트잇) · 컨디션 곡선 · 문제점 · 개선 기회를 쌓는다.
+  // 하루를 시간대 단계로 나누고, 단계마다 일정(포스트잇)과 컨디션 곡선을 쌓는다. 문제점은 옆 칸(checksHtml)에 짧게 모은다.
   const STAGES = [['dawn', '새벽 · 아침', 0, 9], ['morning', '오전', 9, 12], ['noon', '점심', 12, 14], ['afternoon', '오후', 14, 18], ['evening', '저녁', 18, 21], ['night', '밤', 21, 24]];
   const FACE = ['😟', '😐', '🙂', '😊'];
   const scoreOf = it => { const tr = transportFor(it); if (tr && tr.level === 'late') return 0; if (tr && tr.level === 'tight') return 1; return /food|onsen|rest/.test(catKey(it.category)) ? 3 : 2; };
@@ -480,21 +480,22 @@
     const hourOf = it => +it.time.slice(0, 2);
     const cols = STAGES.map(([key, label, a, b]) => ({ key, label, items: items.filter(it => hourOf(it) >= a && hourOf(it) < b) })).filter(c => c.items.length);
     if (!cols.length) return '';
-    const segs = (state.extras && state.extras.transport ? state.extras.transport.segs : []).filter(sg => parseInt(sg.day, 10) === n && sg.level !== 'ok');
-    const segStage = sg => { const m = String(sg.plan).match(/(\d{1,2}):\d{2}/); const h = m ? +m[1] : -1; const st = STAGES.find(([, , a, b]) => h >= a && h < b); return st ? st[0] : null; };
-    const review = state.extras && state.extras.review ? state.extras.review.items.filter(r => parseInt(r.day, 10) === n) : [];
     // 컨디션 곡선: 단계마다 일정 점수 평균(0~3). 지연·빠듯이 있으면 가장 나쁜 점수를 쓴다
     const W = 100, H = 56, pts = cols.map((c, i) => { const sc = c.items.map(scoreOf); const v = Math.min(...sc) <= 1 ? Math.min(...sc) : sc.reduce((x, y) => x + y, 0) / sc.length; return { x: (i + 0.5) * W, y: 8 + (3 - v) / 3 * (H - 16), v }; });
     const path = pts.map((p, i) => { if (!i) return `M${p.x},${p.y}`; const q = pts[i - 1], mx = (q.x + p.x) / 2; return `C${mx},${q.y} ${mx},${p.y} ${p.x},${p.y}`; }).join(' ');
-    const grid = `style="grid-template-columns:var(--jl, 96px) repeat(${cols.length}, minmax(var(--jc, 150px), 1fr))"`;
+    // 문제점은 옆 칸에 따로 있으니, 계획표에서는 해당 포스트잇에 지연 · 빠듯 표시만 단다
+    const note = it => { const st = statusOf(it, now), tr = transportFor(it), lv = tr && tr.level !== 'ok' ? tr.level : '';
+      return `<button class="j-note" data-cat="${catKey(it.category)}" data-open="${esc(it.id)}"${st === 'done' ? ' data-done' : ''}${lv ? ` data-level="${lv}"` : ''}><b>${it.time}${lv ? `<em>${lv === 'late' ? '지연' : '빠듯'}</em>` : ''}</b><span>${esc(it.title)}</span>${it.category ? `<i>${esc(it.category)}</i>` : ''}</button>`; };
+    const face = i => `<span class="j-face-s" title="여유도 ${pts[i].v.toFixed(1)} / 3">${FACE[Math.round(pts[i].v)]}</span>`;
+    const grid = `style="grid-template-columns:var(--jl, 64px) repeat(${cols.length}, minmax(0, 1fr))"`;
+    // 넓은 화면은 단계를 가로로, 폰은 단계를 세로로 쌓아 하루를 한 번에 본다
     return `<div class="journey" aria-label="${n}일차 여정 지도"><div class="j-grid" ${grid}>
       <div class="j-row-label">단계</div>${cols.map(c => `<div class="j-stage" data-stage="${c.key}">${c.label}<small>${c.items.length}개</small></div>`).join('')}
-      <div class="j-row-label">행동</div>${cols.map(c => `<div class="j-cell">${c.items.map(it => { const st = statusOf(it, now); return `<button class="j-note" data-cat="${catKey(it.category)}" data-open="${esc(it.id)}"${st === 'done' ? ' data-done' : ''}><b>${it.time}</b><span>${esc(it.title)}</span>${it.category ? `<i>${esc(it.category)}</i>` : ''}</button>`; }).join('')}</div>`).join('')}
+      <div class="j-row-label">행동</div>${cols.map(c => `<div class="j-cell">${c.items.map(note).join('')}</div>`).join('')}
       <div class="j-row-label">컨디션</div><div class="j-curve" style="grid-column: span ${cols.length}"><svg viewBox="0 0 ${cols.length * W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${path}" class="j-line" vector-effect="non-scaling-stroke"/></svg>
         ${pts.map((p, i) => `<span class="j-face" style="left:${(i + 0.5) / cols.length * 100}%;top:calc(16px + ${(p.y / H).toFixed(3)} * (100% - 32px))" title="여유도 ${p.v.toFixed(1)} / 3">${FACE[Math.round(p.v)]}</span>`).join('')}</div>
-      <div class="j-row-label">문제점</div>${cols.map(c => `<div class="j-cell">${segs.filter(sg => segStage(sg) === c.key).map(sg => `<div class="j-pain" data-level="${sg.level}"><b>${sg.level === 'late' ? '지연' : '빠듯'} · ${esc(sg.seg)}</b><span>${esc(sg.note || sg.mode)}</span></div>`).join('')}</div>`).join('')}
     </div>
-    ${review.length ? `<div class="j-opps"><span class="j-row-label">개선 기회</span>${review.map(r => `<div class="j-opp"><b>${esc(r.seg)}</b><span>${esc(r.after)}</span></div>`).join('')}</div>` : ''}
+    <div class="j-stack">${cols.map((c, i) => `<div class="j-srow"><div class="j-stage" data-stage="${c.key}">${c.label}<small>${c.items.length}개</small>${face(i)}</div><div class="j-snotes">${c.items.map(note).join('')}</div></div>`).join('')}</div>
     </div>`;
   };
 
@@ -515,10 +516,7 @@
     if (sel) pills.scrollLeft = sel.offsetLeft - pills.offsetLeft - (pills.clientWidth - sel.offsetWidth) / 2;
     const plan = state.settings.skin === 'journey' ? journeyDay(d, n, now) : '';
     const checks = checksHtml(n);
-    const issueCnt = state.extras && state.extras.transport ? state.extras.transport.segs.filter(sg => parseInt(sg.day, 10) === n && sg.level !== 'ok').length : 0;
-    // 폰에서는 옆에 둘 자리가 없어 계획표 / 문제점을 바로 옆 버튼으로 바꿔 본다
-    $('#schedule-list').innerHTML = `${checks ? `<div class="pills sched-switch" role="tablist"><button class="pill" role="tab" aria-selected="${state.schedPane !== 'issues'}" data-spane="plan">계획표</button><button class="pill" role="tab" aria-selected="${state.schedPane === 'issues'}" data-spane="issues">문제점${issueCnt ? ` <span class="chip soon">${issueCnt}</span>` : ''}</button></div>` : ''}
-      <div class="sched-layout${checks ? '' : ' solo'}${state.schedPane === 'issues' ? ' show-issues' : ''}">
+    $('#schedule-list').innerHTML = `<div class="sched-layout${checks ? '' : ' solo'}">
         <div class="day-group">
           <div class="day-head">${n}일차 <small>${fmtDate(d)}${d === t ? ' · 오늘' : ''}</small><button class="link add-day" data-add="${d}" aria-label="${fmtShort(d)}에 일정 추가">${icon('plus')}추가</button></div>
           ${plan || `<div class="cards">${state.items.filter(it => it.date === d).map(it => cardHtml(it, now)).join('') || '<p class="empty-note">이 날은 일정이 없어요</p>'}</div>`}
@@ -875,24 +873,20 @@
       <p class="small seg-times"><span>예상 ${esc(s.dep)} → ${esc(s.arr)}${isNaN(s.mins) ? '' : ` (${s.mins}분)`}</span>${isNaN(s.slack) ? '' : `<span class="${s.slack < 0 ? 'neg' : ''}">여유 ${s.slack}분</span>`}</p>
       ${s.note ? `<p class="small seg-note">${esc(s.note)}</p>` : ''}
     </div>`;
-  // n을 주면 그 일차의 구간 · 검토만 보여 준다
+  // 그 일차의 문제점만 계획표 옆 좁은 칸에 짧게 모은다 (자세한 건 일정 상세에서)
   const checksHtml = n => {
     const ex = state.extras; if (!ex || (!ex.transport && !ex.review)) return '';
-    const ofDay = x => !n || parseInt(x.day, 10) === n;
+    const ofDay = x => parseInt(x.day, 10) === n;
     const segs = (ex.transport ? ex.transport.segs : []).filter(ofDay);
     const reviews = (ex.review ? ex.review.items : []).filter(ofDay);
-    const cnt = k => segs.filter(s => s.level === k).length;
     const issues = segs.filter(s => s.level !== 'ok');
+    const cnt = k => segs.filter(s => s.level === k).length;
+    const mini = s => `<li class="mini ${s.level}"><b><span class="${LEVEL[s.level][0]}">${LEVEL[s.level][1]}</span>${esc(s.seg)}</b>${s.note ? `<span>${esc(s.note)}</span>` : ''}</li>`;
     return `<div class="card checks">
-      <h3 class="card-title">${icon('clock')}${n ? `${n}일차 ` : ''}일정 문제점${segs.length ? `<span class="right">${segs.length}구간 확인</span>` : ''}</h3>
-      ${segs.length ? `<p class="check-sum"><span class="chip soon">지연 ${cnt('late')}</span><span class="chip warn">빠듯 ${cnt('tight')}</span><span class="chip done">여유 ${cnt('ok')}</span></p>
-      ${!n && ex.transport.subtitle ? `<p class="muted small">${esc(ex.transport.subtitle)}</p>` : ''}
-      <div class="segs">${issues.map(s => segHtml(s, !!n)).join('')}</div>
-      ${segs.length > issues.length ? `<details class="more"><summary>여유 있는 구간 ${segs.length - issues.length}곳 보기</summary><div class="segs">${segs.filter(s => s.level === 'ok').map(s => segHtml(s, !!n)).join('')}</div></details>` : ''}` : ''}
-      ${!segs.length && !reviews.length ? '<p class="muted small">이 날은 점검할 구간이 없어요 👍</p>' : ''}
-      ${reviews.length ? `<details class="more"${n ? ' open' : ''}><summary>${esc(ex.review.title || '검토 결과')} · ${reviews.length}건</summary>
-        <ul class="review">${reviews.map(r => `<li><div class="seg-head">${n ? '' : `<span class="chip later">${esc(r.day)}</span>`}<b>${esc(r.seg)}</b></div>
-          ${r.before ? `<p class="small"><s class="muted">${esc(r.before)}</s></p>` : ''}<p class="small"><b>→</b> ${esc(r.after)}</p>${r.why ? `<p class="small muted">${esc(r.why)}</p>` : ''}</li>`).join('')}</ul></details>` : ''}
+      <h3 class="card-title">${icon('clock')}문제점${segs.length ? `<span class="right small">지연 ${cnt('late')} · 빠듯 ${cnt('tight')}</span>` : ''}</h3>
+      ${issues.length ? `<ul class="minis">${issues.map(mini).join('')}</ul>` : '<p class="muted small">문제 구간이 없어요 👍</p>'}
+      ${segs.length > issues.length ? `<details class="more"><summary>여유 구간 ${segs.length - issues.length}곳</summary><ul class="minis">${segs.filter(s => s.level === 'ok').map(mini).join('')}</ul></details>` : ''}
+      ${reviews.length ? `<details class="more"><summary>수정안 ${reviews.length}건</summary><ul class="minis">${reviews.map(r => `<li class="mini fix"><b>${esc(r.seg)}</b><span>${esc(r.after)}</span></li>`).join('')}</ul></details>` : ''}
     </div>`;
   };
 
@@ -1081,7 +1075,6 @@
     if (t.hasAttribute('data-close')) { $('#detail').close(); return; }
     if (t.hasAttribute('data-sample')) { loadSample(); return; }
     if (t.dataset.day) { state.day = t.dataset.day; renderToday(); return; }
-    if (t.dataset.spane) { state.schedPane = t.dataset.spane; renderSchedule(); return; }
     if (t.dataset.sday) { state.schedDay = t.dataset.sday; renderSchedule(); window.scrollTo({ top: 0 }); return; }
     if (t.dataset.skin) { state.settings.skin = t.dataset.skin; save(); applySkin(); render(); return; }
     if (t.dataset.lead != null) { state.settings.lead = +t.dataset.lead; save(); render(); return; }

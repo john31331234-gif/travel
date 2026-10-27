@@ -482,13 +482,37 @@ details.more[open] summary { margin-bottom: 10px; }
 .sched-layout > .day-group { min-width: 0; margin-bottom: 0; }
 .sched-side .card { margin: 0; }
 @media (min-width: 960px) {
-  .sched-layout:not(.solo) { display: grid; grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
+  .sched-layout:not(.solo) { display: grid; grid-template-columns: minmax(0, 1fr) 240px; align-items: start; }
   .sched-side { position: sticky; top: 64px; max-height: calc(100dvh - 88px); overflow-y: auto; border-radius: var(--r-card); }
 }
 :root[data-skin="journey"] .sched-pills { background: transparent; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-.sched-switch { margin-top: -8px; }
-.sched-switch .chip { margin-left: 4px; padding: 0 7px; font-size: 12px; }
+/* 문제점 칸: 좁고 짧게 */
+.checks { padding: 14px; gap: 8px; }
+.checks .card-title { font-size: 16px; flex-wrap: wrap; }
+.minis { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mini { display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.35; padding: 6px 8px; border-radius: 8px; background: var(--bg-subtle); border-left: 3px solid var(--success, #0ACF83); }
+.mini.late { background: var(--accent-soft); border-left-color: var(--accent); } .mini.tight { background: var(--warning-soft, #FFF1D6); border-left-color: #F2A100; }
+.mini b { display: flex; align-items: center; gap: 6px; } .mini b .chip { font-size: 11px; padding: 0 6px; min-height: 0; }
+.mini > span { color: var(--text-secondary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.checks details.more summary { font-size: 14px; }
+/* 계획표: 하루 전체가 가로 스크롤 없이 한 화면에 */
+.sched-layout .journey { overflow: visible; }
+.sched-layout .j-grid { min-width: 0; }
+.sched-layout .j-grid > * { padding: 8px; }
+.sched-layout .j-stage { font-size: 14px; flex-wrap: wrap; gap: 2px 6px; }
+.sched-layout .j-note { padding: 7px 8px 8px; font-size: 13px; }
+.sched-layout .j-curve { height: 76px; }
+.j-note b { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.j-note b em { font-style: normal; font-family: var(--font-ko); font-size: 10px; font-weight: 800; color: #fff; background: #F2A100; border-radius: 999px; padding: 1px 6px; }
+.j-note[data-level="late"] b em { background: #F24E1E; }
+.j-note[data-level] { outline: 2px solid #F2A100; outline-offset: 1px; } .j-note[data-level="late"] { outline-color: #F24E1E; }
+.j-stack { display: none; }
+.j-face-s { margin-left: auto; font-size: 18px; }
 @media (max-width: 959px) {
-  .sched-layout.show-issues > .day-group, .sched-layout:not(.show-issues) > .sched-side { display: none; }
+  .sched-layout .j-grid { display: none; }
+  .j-stack { display: flex; flex-direction: column; }
+  .j-srow { display: flex; flex-direction: column; border-top: 1px dashed #E3E3E8; }
+  .j-srow:first-child { border-top: 0; }
+  .j-srow .j-stage { padding: 10px 12px 6px; align-items: center; }
+  .j-snotes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 4px 12px 12px; }
 }
-@media (min-width: 960px) { .sched-switch { display: none; } }
