@@ -590,3 +590,9 @@ details.more[open] summary { margin-bottom: 10px; }
   .tt-block em { font-size: 0; width: 8px; height: 8px; padding: 0; }
   .tt-block.short small { display: none; }
 }
+.timetable.single { --dc: minmax(0, 1fr); }
+.timetable.single .tt-block { font-size: 14px; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 2px 12px; text-align: left; }
+.timetable.single .tt-block small { font-size: 12px; } .timetable.single .tt-block span { -webkit-line-clamp: 2; }
+.timetable.single .tt-block small i { display: inline; }
+.timetable.single .tt-block em { font-size: 10px; width: auto; height: auto; padding: 0 5px; }
+.timetable.single .tt-block small { gap: 0; } .timetable.single .tt-block small em { margin-left: 6px; }
