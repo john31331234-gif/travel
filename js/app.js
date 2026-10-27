@@ -516,10 +516,8 @@
     let score = 0; const why = [];
     const byCat = {};
     its.forEach((it, k) => { const c = catKey(it.category), h = (sp[k][1] - sp[k][0]) / 60; byCat[c] = (byCat[c] || 0) + h; score += h * (PER_HOUR[c] ?? 0.8); });
-    const active = Object.entries(byCat).filter(([c]) => !/rest|onsen|free/.test(c)).reduce((x, [, h]) => x + h, 0);
-    why.push(`활동 ${Math.round(active * 10) / 10}시간`);
-    if (start < 7 * 60) { score += (7 * 60 - start) / 60 * 1.2; why.push(`${addMin('00:00', start)} 시작`); }
-    if (end > 22 * 60) { score += (end - 22 * 60) / 60 * 1; why.push(`${addMin('00:00', end % 1440)} 마무리`); }
+    if (start < 7 * 60) { score += (7 * 60 - start) / 60 * 1.2; }
+    if (end > 22 * 60) { score += (end - 22 * 60) / 60 * 1; }
     const moves = its.filter(i => catKey(i.category) === 'move').length;
     if (moves >= 4) { score += (moves - 3) * 0.5; why.push(`이동 ${moves}번`); }
     const segs = liveSegs().filter(sg => parseInt(sg.day, 10) === n);
@@ -534,17 +532,29 @@
     const lv = score <= cut[0] ? 0 : score <= cut[1] ? 1 : score <= cut[2] ? 2 : 3;
     return { score: Math.round(score * 10) / 10, lv, key: LOAD_LV[lv][0], label: LOAD_LV[lv][1], face: LOAD_LV[lv][2], why, pct: Math.min(100, score / (cut[2] * 1.15) * 100) };
   };
+  // 경비 구분은 늘 같은 순서 · 같은 색 (식비 파랑 · 교통 주황 · 입장료 청록 · 숙박 노랑 · 기타 분홍)
+  const COST_CATS = ['식비', '교통', '입장료', '숙박', '기타'];
+  const COST_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4'];
+  // 도넛: 조각 사이 2px 간격, 조각마다 마우스를 올리면 구분 · 금액 · 비율
+  const donut = (parts, total, size) => {
+    const r = size / 2 - 6, c = 2 * Math.PI * r, gap = parts.length > 1 ? 2 : 0;
+    let off = 0;
+    const segs = parts.map(p => { const len = p.v / total * c, seg = `<circle r="${r}" cx="${size / 2}" cy="${size / 2}" fill="none" stroke="${p.color}" stroke-width="10" stroke-dasharray="${Math.max(0, len - gap)} ${c}" stroke-dashoffset="${-off}"><title>${p.cat} ${won(p.v)} (${Math.round(p.v / total * 100)}%)</title></circle>`; off += len; return seg; }).join('');
+    return `<svg class="donut" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="구분별 경비"><g transform="rotate(-90 ${size / 2} ${size / 2})">${segs}</g></svg>`;
+  };
   // 경비 표의 '일차' 열로 날을 나눈다. '공통'은 여행 일수로 나누고, '준비'는 출발 전 비용으로 따로 둔다
   const dayCost = d => {
     const b = state.extras && state.extras.budget; if (!b) return null;
     const ds = days(), n = ds.indexOf(d) + 1;
-    let budget = 0, actual = 0, common = 0;
+    let budget = 0, actual = 0, common = 0; const byCat = {};
+    const add = (l, v) => { const c = COST_CATS.includes(l.cat) ? l.cat : '기타'; byCat[c] = (byCat[c] || 0) + v; };
     b.lines.forEach(l => {
       const k = parseInt(l.day, 10);
-      if (k === n) { budget += lineKrw(l, b); actual += l.actual || 0; }
-      else if (/공통/.test(l.day)) { common += lineKrw(l, b) / ds.length; actual += (l.actual || 0) / ds.length; }
+      if (k === n) { budget += lineKrw(l, b); actual += l.actual || 0; add(l, lineKrw(l, b)); }
+      else if (/공통/.test(l.day)) { common += lineKrw(l, b) / ds.length; actual += (l.actual || 0) / ds.length; add(l, lineKrw(l, b) / ds.length); }
     });
-    return { budget: budget + common, own: budget, common, actual };
+    const parts = COST_CATS.map((c, i) => ({ cat: c, v: byCat[c] || 0, color: COST_COLORS[i] })).filter(x => x.v > 0.5);
+    return { budget: budget + common, own: budget, common, actual, parts };
   };
 
   // ---------- 시간표: 일차를 열로, 시간을 줄로 놓고 일정을 길이만큼 칸으로 그린다 ----------
@@ -581,13 +591,11 @@
     const hours = Array.from({ length: endH - startH }, (_, i) => `<span style="--t:${i * 60}">${(startH + i) % 24}:00</span>`).join('');
     const segs = liveSegs(), cnt = k => segs.filter(s => s.level === k).length;
     const ov = overlaps().filter(x => ds.includes(x.date));
-    const stam = state.settings.stamina || 'normal';
-    const stamHtml = `<div class="stamina" role="radiogroup" aria-label="내 체력"><span>내 체력</span>${STAMINA.map(([k, l]) => `<button class="pill" role="radio" aria-checked="${k === stam}" aria-selected="${k === stam}" data-stamina="${k}">${l}</button>`).join('')}</div>`;
-    return `<div class="tt-toolbar">${stamHtml}${segs.length ? `<div class="tt-issues"><span class="tt-issues-l">이동 점검</span><span class="chip soon">지연 ${cnt('late')}</span><span class="chip warn">빠듯 ${cnt('tight')}</span></div>` : ''}</div>${ov.length ? `<p class="tt-overlap">${icon('clock')}<span>겹친 일정이 <b>${ov.length}개</b> 있어요. 일정은 겹칠 수 없어요.</span><button class="btn btn-sm btn-primary" data-fix-overlaps>자동 정리</button></p>` : ''}<p class="tt-hint">칸을 누르면 수정 · 빈 곳을 누르면 그 시간에 추가 · 칸을 끌어서 시간 이동</p>
+    return `<div class="tt-toolbar">${segs.length ? `<div class="tt-issues"><span class="tt-issues-l">이동 점검</span><span class="chip soon">지연 ${cnt('late')}</span><span class="chip warn">빠듯 ${cnt('tight')}</span></div>` : ''}</div>${ov.length ? `<p class="tt-overlap">${icon('clock')}<span>겹친 일정이 <b>${ov.length}개</b> 있어요. 일정은 겹칠 수 없어요.</span><button class="btn btn-sm btn-primary" data-fix-overlaps>자동 정리</button></p>` : ''}<p class="tt-hint">칸을 누르면 수정 · 빈 곳을 누르면 그 시간에 추가 · 칸을 끌어서 시간 이동</p>
       <div class="timetable${ds.length === 1 ? ' one' : ''}" style="--days:${ds.length};--startH:${startH}">
         <div class="tt-head"><span class="tt-corner">시간</span>${ds.map((d, i) => `<button class="tt-day${d === t ? ' today' : ''}" data-sday="${d}" data-smode-to="board">${days().indexOf(d) + 1}일차 <small>${fmtShort(d)}</small></button>`).join('')}</div>
         <div class="tt-info"><span class="tt-corner">하루</span>${ds.map(d => { const L = dayLoad(d), C = dayCost(d);
-          return `<div class="tt-dinfo">${L ? `<div class="load ${L.key}" title="부담 점수 ${L.score}"><span class="load-chip">${L.face} ${L.label}</span><span class="load-bar"><i style="width:${L.pct}%"></i></span></div><ul class="load-why">${L.why.slice(0, 3).map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}${C ? `<p class="day-cost"><span>예상 경비</span><b>${won(C.budget)}</b>${C.actual ? `<em>실제 ${won(C.actual)}</em>` : ''}</p>` : ''}</div>`; }).join('')}</div>
+          return `<div class="tt-dinfo">${L ? `<div class="load ${L.key}" title="부담 점수 ${L.score}"><span class="load-chip">${L.face} ${L.label}</span><span class="load-bar"><i style="width:${L.pct}%"></i></span></div><ul class="load-why">${L.why.length ? L.why.slice(0, 3).map(w => `<li>${esc(w)}</li>`).join('') : '<li>특별히 힘든 구간 없음</li>'}</ul>` : ''}${C ? `<div class="day-cost"><p><span>예상 경비</span><b>${won(C.budget)}</b>${C.actual ? `<em>실제 ${won(C.actual)}</em>` : ''}</p>${C.parts.length ? `<div class="cost-pie">${donut(C.parts, C.budget, PHONE.matches && ds.length === 1 ? 96 : 76)}<ul class="cost-legend">${C.parts.map(x => `<li><i style="background:${x.color}"></i><span>${x.cat}</span><b>${won(x.v)}</b><small>${Math.round(x.v / C.budget * 100)}%</small></li>`).join('')}</ul></div>` : ''}</div>` : ''}</div>`; }).join('')}</div>
         <div class="tt-body"><div class="tt-hours" style="--total:${total}">${hours}</div>${ds.map(col).join('')}</div>
       </div>`;
   };
@@ -1484,6 +1492,7 @@
   const SKINS = [['journey', '여정 지도'], ['sketch', '손그림 노트']];
   const applySkin = () => { document.documentElement.dataset.skin = state.settings.skin === 'sketch' ? 'sketch' : 'journey'; const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = state.settings.skin === 'sketch' ? '#FFF0A0' : '#FFFFFF'; };
   const renderSettings = () => {
+    $('#stamina-pills').innerHTML = STAMINA.map(([k, l]) => `<button class="pill ${(state.settings.stamina || 'normal') === k ? 'on' : ''}" data-stamina="${k}">${l}</button>`).join('');
     $('#skin-pills').innerHTML = SKINS.map(([k, l]) => `<button class="pill ${(state.settings.skin || 'journey') === k ? 'on' : ''}" data-skin="${k}">${l}</button>`).join('');
     $('#t-notify').setAttribute('aria-checked', String(!!state.settings.notify && !notifyBlocker() && Notification.permission === 'granted'));
     $('#t-sound').setAttribute('aria-checked', String(!!state.settings.sound));
