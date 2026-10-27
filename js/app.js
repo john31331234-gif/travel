@@ -501,6 +501,52 @@
     </div>`;
   };
 
+  // ---------- 하루 체력 부담 · 하루 경비 ----------
+  // 일정 종류별로 1시간에 드는 힘을 더하고(쉬는 일정은 회복으로 뺀다), 이른 시작 · 늦은 마무리 · 걷는 이동 ·
+  // 갈아타기 · 지연/빠듯 구간을 더해 점수를 낸다. 같은 점수라도 체력(약함 · 보통 · 강함)에 따라 판정이 달라진다.
+  const STAMINA = [['weak', '약함'], ['normal', '보통'], ['strong', '강함']];
+  const LOAD_LV = [['easy', '여유', '😌'], ['ok', '적당', '🙂'], ['hard', '힘듦', '😮‍💨'], ['over', '무리', '🥵']];
+  const LOAD_CUT = { weak: [6, 9, 12], normal: [9, 13, 17], strong: [11, 16, 21] };
+  const PER_HOUR = { sight: 1.2, move: 0.9, prep: 0.7, etc: 0.8, none: 0.8, food: 0.3, free: 0.1, rest: -0.5, onsen: -0.6 };
+  const dayLoad = d => {
+    const its = state.items.filter(i => i.date === d);
+    if (!its.length) return null;
+    const n = days().indexOf(d) + 1, sp = its.map(spanOf);
+    const start = Math.min(...sp.map(x => x[0])), end = Math.max(...sp.map(x => x[1]));
+    let score = 0; const why = [];
+    const byCat = {};
+    its.forEach((it, k) => { const c = catKey(it.category), h = (sp[k][1] - sp[k][0]) / 60; byCat[c] = (byCat[c] || 0) + h; score += h * (PER_HOUR[c] ?? 0.8); });
+    const active = Object.entries(byCat).filter(([c]) => !/rest|onsen|free/.test(c)).reduce((x, [, h]) => x + h, 0);
+    why.push(`활동 ${Math.round(active * 10) / 10}시간`);
+    if (start < 7 * 60) { score += (7 * 60 - start) / 60 * 1.2; why.push(`${addMin('00:00', start)} 시작`); }
+    if (end > 22 * 60) { score += (end - 22 * 60) / 60 * 1; why.push(`${addMin('00:00', end % 1440)} 마무리`); }
+    const moves = its.filter(i => catKey(i.category) === 'move').length;
+    if (moves >= 4) { score += (moves - 3) * 0.5; why.push(`이동 ${moves}번`); }
+    const segs = liveSegs().filter(sg => parseInt(sg.day, 10) === n);
+    // 교통수단 글자에 적힌 '도보 (약) N분'만 걷는 시간으로 센다
+    const walk = segs.reduce((x, sg) => { const m = String(sg.mode).match(/도보\s*(?:약\s*)?(\d+)\s*분/); return x + (m ? +m[1] : 0); }, 0);
+    if (walk) { score += walk / 30; if (walk >= 30) why.push(`걷는 이동 ${walk}분`); }
+    const late = segs.filter(sg => sg.level === 'late').length, tight = segs.filter(sg => sg.level === 'tight').length;
+    if (late || tight) { score += late * 1.5 + tight * 0.7; why.push([late && `지연 ${late}`, tight && `빠듯 ${tight}`].filter(Boolean).join(' · ')); }
+    const rest = (byCat.rest || 0) + (byCat.onsen || 0);
+    if (rest >= 1) why.push(`쉬는 시간 ${Math.round(rest * 10) / 10}시간`);
+    const cut = LOAD_CUT[state.settings.stamina] || LOAD_CUT.normal;
+    const lv = score <= cut[0] ? 0 : score <= cut[1] ? 1 : score <= cut[2] ? 2 : 3;
+    return { score: Math.round(score * 10) / 10, lv, key: LOAD_LV[lv][0], label: LOAD_LV[lv][1], face: LOAD_LV[lv][2], why, pct: Math.min(100, score / (cut[2] * 1.15) * 100) };
+  };
+  // 경비 표의 '일차' 열로 날을 나눈다. '공통'은 여행 일수로 나누고, '준비'는 출발 전 비용으로 따로 둔다
+  const dayCost = d => {
+    const b = state.extras && state.extras.budget; if (!b) return null;
+    const ds = days(), n = ds.indexOf(d) + 1;
+    let budget = 0, actual = 0, common = 0;
+    b.lines.forEach(l => {
+      const k = parseInt(l.day, 10);
+      if (k === n) { budget += lineKrw(l, b); actual += l.actual || 0; }
+      else if (/공통/.test(l.day)) { common += lineKrw(l, b) / ds.length; actual += (l.actual || 0) / ds.length; }
+    });
+    return { budget: budget + common, own: budget, common, actual };
+  };
+
   // ---------- 시간표: 일차를 열로, 시간을 줄로 놓고 일정을 길이만큼 칸으로 그린다 ----------
   const timetable = (ds, t, now) => {
     const all = state.items.filter(i => ds.includes(i.date));
@@ -535,9 +581,13 @@
     const hours = Array.from({ length: endH - startH }, (_, i) => `<span style="--t:${i * 60}">${(startH + i) % 24}:00</span>`).join('');
     const segs = liveSegs(), cnt = k => segs.filter(s => s.level === k).length;
     const ov = overlaps().filter(x => ds.includes(x.date));
-    return `${ov.length ? `<p class="tt-overlap">${icon('clock')}<span>겹친 일정이 <b>${ov.length}개</b> 있어요. 일정은 겹칠 수 없어요.</span><button class="btn btn-sm btn-primary" data-fix-overlaps>자동 정리</button></p>` : ''}${segs.length ? `<p class="tt-sum"><span class="chip soon">지연 ${cnt('late')}</span><span class="chip warn">빠듯 ${cnt('tight')}</span><span class="muted small">표시된 칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</span></p>` : '<p class="tt-sum muted small">칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</p>'}
+    const stam = state.settings.stamina || 'normal';
+    const stamHtml = `<div class="stamina" role="radiogroup" aria-label="내 체력"><span>내 체력</span>${STAMINA.map(([k, l]) => `<button class="pill" role="radio" aria-checked="${k === stam}" aria-selected="${k === stam}" data-stamina="${k}">${l}</button>`).join('')}</div>`;
+    return `${stamHtml}${ov.length ? `<p class="tt-overlap">${icon('clock')}<span>겹친 일정이 <b>${ov.length}개</b> 있어요. 일정은 겹칠 수 없어요.</span><button class="btn btn-sm btn-primary" data-fix-overlaps>자동 정리</button></p>` : ''}${segs.length ? `<p class="tt-sum"><span class="chip soon">지연 ${cnt('late')}</span><span class="chip warn">빠듯 ${cnt('tight')}</span><span class="muted small">표시된 칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</span></p>` : '<p class="tt-sum muted small">칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</p>'}
       <div class="timetable${ds.length === 1 ? ' one' : ''}" style="--days:${ds.length};--startH:${startH}">
         <div class="tt-head"><span class="tt-corner">시간</span>${ds.map((d, i) => `<button class="tt-day${d === t ? ' today' : ''}" data-sday="${d}" data-smode-to="board">${days().indexOf(d) + 1}일차 <small>${fmtShort(d)}</small></button>`).join('')}</div>
+        <div class="tt-info"><span class="tt-corner">하루</span>${ds.map(d => { const L = dayLoad(d), C = dayCost(d);
+          return `<div class="tt-dinfo">${L ? `<div class="load ${L.key}" title="부담 점수 ${L.score}"><b>${L.face} ${L.label}</b><span class="load-bar"><i style="width:${L.pct}%"></i></span></div><p class="load-why">${L.why.slice(0, 3).map(esc).join(' · ')}</p>` : ''}${C ? `<p class="day-cost">${icon('wallet')}<b>${won(C.budget)}</b>${C.actual ? `<span>실제 ${won(C.actual)}</span>` : ''}</p>` : ''}</div>`; }).join('')}</div>
         <div class="tt-body"><div class="tt-hours" style="--total:${total}">${hours}</div>${ds.map(col).join('')}</div>
       </div>`;
   };
@@ -1308,6 +1358,20 @@
           ${c.actual ? `<span class="small ${c.actual > c.budget ? 'neg' : 'muted'}">실제 ${won(c.actual)}</span>` : ''}
         </div>`).join('')}</div>
       </div>
+      ${(() => { // 일별 경비: 출발 전(준비) + 일차별(공통 비용은 일수로 나눠 더함)
+        const ds = days(), pre = b.lines.filter(l => !parseInt(l.day, 10) && !/공통/.test(l.day));
+        const rows = [{ name: '출발 전', sub: '항공 · 숙박 등', budget: pre.reduce((x, l) => x + lineKrw(l, b), 0), actual: pre.reduce((x, l) => x + (l.actual || 0), 0) }]
+          .concat(ds.map((d, i) => { const c = dayCost(d), L = dayLoad(d); return { name: `${i + 1}일차`, sub: `${fmtShort(d)}${c.common ? ` · 공통 ${won(c.common)} 포함` : ''}`, face: L ? L.face : '', budget: c.budget, actual: c.actual }; }));
+        const max = Math.max(...rows.map(r => Math.max(r.budget, r.actual)), 1);
+        const daysOnly = rows.slice(1), avg = daysOnly.reduce((x, r) => x + r.budget, 0) / (daysOnly.length || 1);
+        return `<div class="card">
+          <h3 class="card-title">${icon('calendar')}일별 경비<span class="right">여행 중 하루 평균 ${won(avg)}</span></h3>
+          <div class="day-costs">${rows.map(r => `<div class="dc-row">
+            <div class="dc-name"><b>${r.name} ${r.face || ''}</b><span class="muted small">${esc(r.sub)}</span></div>
+            <div class="dc-bar"><span style="width:${r.budget / max * 100}%"></span>${r.actual ? `<em class="${r.actual > r.budget ? 'over' : ''}" style="width:${r.actual / max * 100}%"></em>` : ''}</div>
+            <div class="dc-num"><b>${won(r.budget)}</b>${r.actual ? `<span class="small ${r.actual > r.budget ? 'neg' : 'muted'}">실제 ${won(r.actual)}</span>` : ''}</div>
+          </div>`).join('')}</div>
+        </div>`; })()}
       ${groups.map(g => {
         const sub = g.lines.reduce((s, l) => s + lineKrw(l, b), 0);
         return `<div class="card">
@@ -1470,6 +1534,7 @@
     if (t.hasAttribute('data-close')) { $('#detail').close(); return; }
     if (t.hasAttribute('data-sample')) { loadSample(); return; }
     if (t.dataset.day) { state.day = t.dataset.day; renderToday(); return; }
+    if (t.dataset.stamina) { state.settings.stamina = t.dataset.stamina; save(); render(); return; }
     if (t.dataset.tday) { state.ttDay = t.dataset.tday; renderSchedule(); return; }
     if (t.dataset.smode) { state.settings.schedMode = t.dataset.smode; save(); renderSchedule(); return; }
     if (t.dataset.smodeTo) { state.settings.schedMode = t.dataset.smodeTo; save(); }
