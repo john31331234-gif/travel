@@ -473,3 +473,22 @@ details.more[open] summary { margin-bottom: 10px; }
 .j-opp { flex: 1 1 220px; background: #DDF7EA; border-left: 4px solid #0ACF83; border-radius: 4px 8px 8px 4px; padding: 7px 9px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
 .j-opp span { color: #33503F; line-height: 1.35; }
 @media (max-width: 600px) { .journey { --jl: 58px; --jc: 140px; } .j-row-label { font-size: 11px; padding: 10px 6px !important; } .j-stage { font-size: 14px; flex-wrap: wrap; } }
+
+/* 전체 일정: 일차 버튼 + 계획표 · 문제점 나란히 */
+.sched-pills { position: sticky; top: 0; z-index: 5; background: var(--bg-canvas); padding: 8px 2px; margin: -6px -2px 0; }
+.sched-pills .pill { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; padding: 6px 18px; }
+.sched-pills .pill small { font-size: 12px; font-weight: 400; opacity: .75; }
+.sched-layout { display: flex; flex-direction: column; gap: 18px; }
+.sched-layout > .day-group { min-width: 0; margin-bottom: 0; }
+.sched-side .card { margin: 0; }
+@media (min-width: 960px) {
+  .sched-layout:not(.solo) { display: grid; grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
+  .sched-side { position: sticky; top: 64px; max-height: calc(100dvh - 88px); overflow-y: auto; border-radius: var(--r-card); }
+}
+:root[data-skin="journey"] .sched-pills { background: transparent; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.sched-switch { margin-top: -8px; }
+.sched-switch .chip { margin-left: 4px; padding: 0 7px; font-size: 12px; }
+@media (max-width: 959px) {
+  .sched-layout.show-issues > .day-group, .sched-layout:not(.show-issues) > .sched-side { display: none; }
+}
+@media (min-width: 960px) { .sched-switch { display: none; } }

@@ -500,13 +500,31 @@
 
   // ---------- 화면: 전체 일정 ----------
   const renderSchedule = () => {
-    const now = Date.now(), ds = days();
-    $('#schedule-list').innerHTML = !ds.length
-      ? `<div class="card empty-note"><p>아직 일정이 없어요. 엑셀을 올리거나 직접 만들어 보세요.</p><div class="btn-row"><button class="btn btn-primary" data-add="">${icon('plus')}직접 만들기</button><button class="btn btn-secondary" data-view="upload">${icon('upload')}엑셀 올리기</button></div></div>`
-      : checksHtml() + ds.map((d, i) => `<div class="day-group">
-          <div class="day-head">${i + 1}일차 <small>${fmtDate(d)}${d === todayStr() ? ' · 오늘' : ''}</small><button class="link add-day" data-add="${d}" aria-label="${fmtShort(d)}에 일정 추가">${icon('plus')}추가</button></div>
-          ${state.settings.skin === 'journey' ? journeyDay(d, i + 1, now) : `<div class="cards">${state.items.filter(it => it.date === d).map(it => cardHtml(it, now)).join('')}</div>`}
-        </div>`).join('');
+    const now = Date.now(), ds = days(), t = todayStr();
+    const pills = $('#sched-pills');
+    pills.hidden = !ds.length;
+    if (!ds.length) {
+      $('#schedule-list').innerHTML = `<div class="card empty-note"><p>아직 일정이 없어요. 엑셀을 올리거나 직접 만들어 보세요.</p><div class="btn-row"><button class="btn btn-primary" data-add="">${icon('plus')}직접 만들기</button><button class="btn btn-secondary" data-view="upload">${icon('upload')}엑셀 올리기</button></div></div>`;
+      return;
+    }
+    // 일차 버튼으로 하루씩 본다. 처음엔 오늘(여행 중) 또는 다가오는 날
+    if (!state.schedDay || !ds.includes(state.schedDay)) state.schedDay = ds.includes(t) ? t : (ds.find(d => d >= t) || ds[0]);
+    const d = state.schedDay, n = ds.indexOf(d) + 1;
+    pills.innerHTML = ds.map((x, i) => `<button class="pill" role="tab" aria-selected="${x === d}" data-sday="${x}">${i + 1}일차<small>${fmtShort(x)}</small></button>`).join('');
+    const sel = $('[aria-selected="true"]', pills);
+    if (sel) pills.scrollLeft = sel.offsetLeft - pills.offsetLeft - (pills.clientWidth - sel.offsetWidth) / 2;
+    const plan = state.settings.skin === 'journey' ? journeyDay(d, n, now) : '';
+    const checks = checksHtml(n);
+    const issueCnt = state.extras && state.extras.transport ? state.extras.transport.segs.filter(sg => parseInt(sg.day, 10) === n && sg.level !== 'ok').length : 0;
+    // 폰에서는 옆에 둘 자리가 없어 계획표 / 문제점을 바로 옆 버튼으로 바꿔 본다
+    $('#schedule-list').innerHTML = `${checks ? `<div class="pills sched-switch" role="tablist"><button class="pill" role="tab" aria-selected="${state.schedPane !== 'issues'}" data-spane="plan">계획표</button><button class="pill" role="tab" aria-selected="${state.schedPane === 'issues'}" data-spane="issues">문제점${issueCnt ? ` <span class="chip soon">${issueCnt}</span>` : ''}</button></div>` : ''}
+      <div class="sched-layout${checks ? '' : ' solo'}${state.schedPane === 'issues' ? ' show-issues' : ''}">
+        <div class="day-group">
+          <div class="day-head">${n}일차 <small>${fmtDate(d)}${d === t ? ' · 오늘' : ''}</small><button class="link add-day" data-add="${d}" aria-label="${fmtShort(d)}에 일정 추가">${icon('plus')}추가</button></div>
+          ${plan || `<div class="cards">${state.items.filter(it => it.date === d).map(it => cardHtml(it, now)).join('') || '<p class="empty-note">이 날은 일정이 없어요</p>'}</div>`}
+        </div>
+        ${checks ? `<aside class="sched-side">${checks}</aside>` : ''}
+      </div>`;
   };
 
   // ---------- 위젯 ----------
@@ -857,19 +875,23 @@
       <p class="small seg-times"><span>예상 ${esc(s.dep)} → ${esc(s.arr)}${isNaN(s.mins) ? '' : ` (${s.mins}분)`}</span>${isNaN(s.slack) ? '' : `<span class="${s.slack < 0 ? 'neg' : ''}">여유 ${s.slack}분</span>`}</p>
       ${s.note ? `<p class="small seg-note">${esc(s.note)}</p>` : ''}
     </div>`;
-  const checksHtml = () => {
+  // n을 주면 그 일차의 구간 · 검토만 보여 준다
+  const checksHtml = n => {
     const ex = state.extras; if (!ex || (!ex.transport && !ex.review)) return '';
-    const segs = ex.transport ? ex.transport.segs : [];
+    const ofDay = x => !n || parseInt(x.day, 10) === n;
+    const segs = (ex.transport ? ex.transport.segs : []).filter(ofDay);
+    const reviews = (ex.review ? ex.review.items : []).filter(ofDay);
     const cnt = k => segs.filter(s => s.level === k).length;
     const issues = segs.filter(s => s.level !== 'ok');
-    return `<div class="card">
-      <h3 class="card-title">${icon('clock')}일정 점검${segs.length ? `<span class="right">${segs.length}구간 확인</span>` : ''}</h3>
+    return `<div class="card checks">
+      <h3 class="card-title">${icon('clock')}${n ? `${n}일차 ` : ''}일정 문제점${segs.length ? `<span class="right">${segs.length}구간 확인</span>` : ''}</h3>
       ${segs.length ? `<p class="check-sum"><span class="chip soon">지연 ${cnt('late')}</span><span class="chip warn">빠듯 ${cnt('tight')}</span><span class="chip done">여유 ${cnt('ok')}</span></p>
-      ${ex.transport.subtitle ? `<p class="muted small">${esc(ex.transport.subtitle)}</p>` : ''}
-      <div class="segs">${issues.map(s => segHtml(s)).join('')}</div>
-      ${segs.length > issues.length ? `<details class="more"><summary>여유 있는 구간 ${segs.length - issues.length}곳 보기</summary><div class="segs">${segs.filter(s => s.level === 'ok').map(s => segHtml(s)).join('')}</div></details>` : ''}` : ''}
-      ${ex.review && ex.review.items.length ? `<details class="more"><summary>${esc(ex.review.title || '검토 결과')} · ${ex.review.items.length}건</summary>
-        <ul class="review">${ex.review.items.map(r => `<li><div class="seg-head"><span class="chip later">${esc(r.day)}</span><b>${esc(r.seg)}</b></div>
+      ${!n && ex.transport.subtitle ? `<p class="muted small">${esc(ex.transport.subtitle)}</p>` : ''}
+      <div class="segs">${issues.map(s => segHtml(s, !!n)).join('')}</div>
+      ${segs.length > issues.length ? `<details class="more"><summary>여유 있는 구간 ${segs.length - issues.length}곳 보기</summary><div class="segs">${segs.filter(s => s.level === 'ok').map(s => segHtml(s, !!n)).join('')}</div></details>` : ''}` : ''}
+      ${!segs.length && !reviews.length ? '<p class="muted small">이 날은 점검할 구간이 없어요 👍</p>' : ''}
+      ${reviews.length ? `<details class="more"${n ? ' open' : ''}><summary>${esc(ex.review.title || '검토 결과')} · ${reviews.length}건</summary>
+        <ul class="review">${reviews.map(r => `<li><div class="seg-head">${n ? '' : `<span class="chip later">${esc(r.day)}</span>`}<b>${esc(r.seg)}</b></div>
           ${r.before ? `<p class="small"><s class="muted">${esc(r.before)}</s></p>` : ''}<p class="small"><b>→</b> ${esc(r.after)}</p>${r.why ? `<p class="small muted">${esc(r.why)}</p>` : ''}</li>`).join('')}</ul></details>` : ''}
     </div>`;
   };
@@ -1059,6 +1081,8 @@
     if (t.hasAttribute('data-close')) { $('#detail').close(); return; }
     if (t.hasAttribute('data-sample')) { loadSample(); return; }
     if (t.dataset.day) { state.day = t.dataset.day; renderToday(); return; }
+    if (t.dataset.spane) { state.schedPane = t.dataset.spane; renderSchedule(); return; }
+    if (t.dataset.sday) { state.schedDay = t.dataset.sday; renderSchedule(); window.scrollTo({ top: 0 }); return; }
     if (t.dataset.skin) { state.settings.skin = t.dataset.skin; save(); applySkin(); render(); return; }
     if (t.dataset.lead != null) { state.settings.lead = +t.dataset.lead; save(); render(); return; }
     if (t.dataset.itemLead != null) {

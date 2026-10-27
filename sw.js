@@ -1,5 +1,5 @@
 /* 트립알림 서비스 워커: 앱 화면을 캐시해 오프라인에서도 열리게 하고, 알림을 누르면 앱으로 돌아온다. */
-const CACHE = 'tripalarm-v2';
+const CACHE = 'tripalarm-v3';
 const SHELL = ['./', 'index.html', 'css/style.css', 'js/app.js', 'vendor/xlsx.full.min.js', 'vendor/firebase/firebase-app-compat.js', 'vendor/firebase/firebase-auth-compat.js', 'vendor/firebase/firebase-firestore-compat.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
