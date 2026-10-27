@@ -623,3 +623,26 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
 .fix-body ul { margin: 0; padding-left: 18px; font-size: 14px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 2px; }
 .fix-body small { font-size: 13px; color: var(--text-secondary); } .fix-body strong { color: #12733B; }
 .timetable[style*="--days:1;"] .tt-block small i { display: inline; } .timetable[style*="--days:1;"] .tt-block em { font-size: 10px; width: auto; height: auto; padding: 0 5px; }
+
+/* 폰 · 하루 시간표: 칸을 조금 키우고 칸 길이에 맞춰 글자 크기 조절 */
+@media (max-width: 959px) {
+  .timetable.one { --ppm: 1.5; --hc: 48px; }
+  .timetable.one .tt-hours span { font-size: 12px; }
+  .timetable.one .tt-block { align-items: flex-start; justify-content: center; text-align: left; padding: 4px 12px; gap: 2px; }
+  .timetable.one .tt-block span { -webkit-line-clamp: 2; word-break: keep-all; }
+  .timetable.one .tt-block small { gap: 6px; }
+  .timetable.one .tt-block small i { display: inline; }
+  .timetable.one .tt-block em { font-size: 11px; width: auto; height: auto; padding: 1px 7px; }
+  /* 아주 짧은 칸: 한 줄에 시간 + 이름 */
+  .timetable.one .tt-block.sz-xs, .timetable.one .tt-block.sz-s { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; padding-top: 0; padding-bottom: 0; }
+  .timetable.one .tt-block.sz-xs span, .timetable.one .tt-block.sz-s span { -webkit-line-clamp: 1; }
+  .timetable.one .tt-block.sz-xs small { font-size: 11px; } .timetable.one .tt-block.sz-xs span { font-size: 13px; line-height: 1.1; }
+  .timetable.one .tt-block.sz-s small { font-size: 12.5px; } .timetable.one .tt-block.sz-s span { font-size: 15px; }
+  .timetable.one .tt-block.sz-m small { font-size: 13px; } .timetable.one .tt-block.sz-m span { font-size: 16px; }
+  .timetable.one .tt-block.sz-l { justify-content: flex-start; padding-top: 10px; gap: 4px; }
+  .timetable.one .tt-block.sz-l small { font-size: 14px; } .timetable.one .tt-block.sz-l span { font-size: 18px; -webkit-line-clamp: 3; }
+}
+@media (max-width: 959px) {
+  .timetable.one .tt-block small, .timetable.one .tt-block.short small { display: flex; gap: 0; flex: none; }
+  .timetable.one .tt-block small em { margin-left: 6px; }
+}
