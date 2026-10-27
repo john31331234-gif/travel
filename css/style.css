@@ -646,3 +646,8 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
   .timetable.one .tt-block small, .timetable.one .tt-block.short small { display: flex; gap: 0; flex: none; }
   .timetable.one .tt-block small em { margin-left: 6px; }
 }
+/* 폰 · 하루 시간표: 글자는 모든 칸에서 가로 · 세로 가운데 */
+@media (max-width: 959px) {
+  .timetable.one .tt-block, .timetable.one .tt-block.sz-l, .timetable.one .tt-block.sz-xs, .timetable.one .tt-block.sz-s { align-items: center; justify-content: center; text-align: center; padding: 2px 12px; }
+  .timetable.one .tt-block small { justify-content: center; }
+}
