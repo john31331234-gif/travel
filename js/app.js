@@ -535,7 +535,7 @@
     const ov = overlaps().filter(x => ds.includes(x.date));
     return `${ov.length ? `<p class="tt-overlap">${icon('clock')}<span>겹친 일정이 <b>${ov.length}개</b> 있어요. 일정은 겹칠 수 없어요.</span><button class="btn btn-sm btn-primary" data-fix-overlaps>자동 정리</button></p>` : ''}${segs.length ? `<p class="tt-sum"><span class="chip soon">지연 ${cnt('late')}</span><span class="chip warn">빠듯 ${cnt('tight')}</span><span class="muted small">표시된 칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</span></p>` : '<p class="tt-sum muted small">칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</p>'}
       <div class="timetable" style="--days:${ds.length};--startH:${startH}">
-        <div class="tt-head"><span class="tt-corner">시간</span>${ds.map((d, i) => `<button class="tt-day${d === t ? ' today' : ''}" data-sday="${d}" data-smode-to="board">${i + 1}일차 <small>${fmtShort(d)}</small></button>`).join('')}</div>
+        <div class="tt-head"><span class="tt-corner">시간</span>${ds.map((d, i) => `<button class="tt-day${d === t ? ' today' : ''}" data-sday="${d}" data-smode-to="board">${days().indexOf(d) + 1}일차 <small>${fmtShort(d)}</small></button>`).join('')}</div>
         <div class="tt-body"><div class="tt-hours" style="--total:${total}">${hours}</div>${ds.map(col).join('')}</div>
       </div>`;
   };
@@ -624,6 +624,9 @@
   // 꾹 누를 때 뜨는 길게 누르기 메뉴 · 글자 선택 막기
   document.addEventListener('contextmenu', e => { if (e.target.closest && e.target.closest('.tt-block')) e.preventDefault(); });
 
+  const PHONE = matchMedia('(max-width: 959px)');
+  PHONE.addEventListener && PHONE.addEventListener('change', () => { if (state.view === 'schedule') renderSchedule(); });
+
   // ---------- 화면: 전체 일정 ----------
   const renderSchedule = () => {
     const now = Date.now(), ds = days(), t = todayStr();
@@ -638,7 +641,19 @@
     const mode = state.settings.schedMode === 'board' ? 'board' : 'table';
     $('#sched-mode').hidden = false;
     $('#sched-mode').innerHTML = [['table', '시간표'], ['board', '일차별']].map(([k, l]) => `<button class="pill" role="tab" aria-selected="${k === mode}" data-smode="${k}">${l}</button>`).join('');
-    if (mode === 'table') { pills.hidden = true; $('#schedule-list').innerHTML = timetable(ds, t, now); state.flash = null; return; }
+    if (mode === 'table') {
+      // 폰에서는 4일을 한꺼번에 넣으면 칸이 좁아서 일차 버튼으로 하루씩 본다 (데스크톱은 전체 그대로)
+      const phone = PHONE.matches;
+      pills.hidden = !phone;
+      if (phone) {
+        if (!ds.includes(state.ttDay)) state.ttDay = ds.includes(t) ? t : (ds.find(d => d >= t) || ds[0]);
+        pills.innerHTML = ds.map((x, i) => `<button class="pill" role="tab" aria-selected="${x === state.ttDay}" data-tday="${x}">${i + 1}일차<small>${fmtShort(x)}</small></button>`).join('');
+        const sel = $('[aria-selected="true"]', pills);
+        if (sel) pills.scrollLeft = sel.offsetLeft - pills.offsetLeft - (pills.clientWidth - sel.offsetWidth) / 2;
+      }
+      $('#schedule-list').innerHTML = timetable(phone ? [state.ttDay] : ds, t, now);
+      state.flash = null; return;
+    }
     // 일차 버튼으로 하루씩 본다. 처음엔 오늘(여행 중) 또는 다가오는 날
     if (!state.schedDay || !ds.includes(state.schedDay)) state.schedDay = ds.includes(t) ? t : (ds.find(d => d >= t) || ds[0]);
     const d = state.schedDay, n = ds.indexOf(d) + 1;
@@ -1453,6 +1468,7 @@
     if (t.hasAttribute('data-close')) { $('#detail').close(); return; }
     if (t.hasAttribute('data-sample')) { loadSample(); return; }
     if (t.dataset.day) { state.day = t.dataset.day; renderToday(); return; }
+    if (t.dataset.tday) { state.ttDay = t.dataset.tday; renderSchedule(); return; }
     if (t.dataset.smode) { state.settings.schedMode = t.dataset.smode; save(); renderSchedule(); return; }
     if (t.dataset.smodeTo) { state.settings.schedMode = t.dataset.smodeTo; save(); }
     if (t.dataset.sday) { state.schedDay = t.dataset.sday; renderSchedule(); window.scrollTo({ top: 0 }); return; }

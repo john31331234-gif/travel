@@ -622,3 +622,4 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
 .fix-body b { font-size: 15px; } .fix-body b i { font-style: normal; font-size: 11px; color: #fff; background: var(--brand); padding: 1px 7px; border-radius: 999px; margin-left: 4px; vertical-align: 2px; }
 .fix-body ul { margin: 0; padding-left: 18px; font-size: 14px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 2px; }
 .fix-body small { font-size: 13px; color: var(--text-secondary); } .fix-body strong { color: #12733B; }
+.timetable[style*="--days:1;"] .tt-block small i { display: inline; } .timetable[style*="--days:1;"] .tt-block em { font-size: 10px; width: auto; height: auto; padding: 0 5px; }
