@@ -1014,7 +1014,7 @@
     toast(`겹친 일정 ${n}곳을 정리했어요`, '앞 일정의 끝을 다음 일정 시작에 맞췄어요', null, true);
   };
   let undoBuf = null;
-  const remember = () => { undoBuf = JSON.stringify(state.items); };
+  const remember = () => { undoBuf = JSON.stringify({ items: state.items, budget: state.extras && state.extras.budget || null }); };
   const openEditor = (id, date, at) => {
     const it = id ? state.items.find(i => i.id === id) : null;
     const dlg = $('#detail'), ds = days();
@@ -1129,7 +1129,8 @@
 
   const undo = () => {
     if (!undoBuf) return;
-    state.items = JSON.parse(undoBuf); undoBuf = null;
+    const u = JSON.parse(undoBuf); undoBuf = null;
+    state.items = u.items; if (u.budget) { if (!state.extras) state.extras = {}; state.extras.budget = u.budget; } else if (state.extras) delete state.extras.budget;
     save(); render(); toast('되돌렸어요');
   };
 
@@ -1331,11 +1332,12 @@
   // ---------- 여행 경비 ----------
   const won = n => '₩' + Math.round(n).toLocaleString();
   const yen = (n, cur) => (cur === 'JPY' ? '¥' : cur === 'USD' ? '$' : cur === 'EUR' ? '€' : cur + ' ') + (Math.round(n * 100) / 100).toLocaleString();
-  const lineKrw = (l, b) => l.cur === 'KRW' ? l.unit * l.qty : b.rate ? l.unit * l.qty * b.rate : l.budget;
+  // 환율이 아직 없으면 엑셀의 예산 값, 그것도 없으면(직접 적은 경비) 실시간 환율로 계산
+  const lineKrw = (l, b) => l.cur === 'KRW' ? l.unit * l.qty : b.rate ? l.unit * l.qty * b.rate : l.budget || l.unit * l.qty * (krwPer(l.cur) || 0);
   const renderBudget = () => {
     const box = $('#budget-body'), b = state.extras && state.extras.budget;
     if (!b) {
-      box.innerHTML = `<div class="card empty-note"><p>엑셀에 <b>여행경비</b> 표(구분 · 항목 · 단가 · 통화 · 수량 · 예산 열)가 있으면 여기에 보여요.</p><button class="btn btn-secondary" data-view="upload">${icon('upload')}엑셀 올리기</button></div>`;
+      box.innerHTML = `<div class="card empty-note"><p>엑셀에 <b>여행경비</b> 표(구분 · 항목 · 단가 · 통화 · 수량 · 예산 열)가 있으면 여기에 보여요. 직접 하나씩 적어도 돼요.</p><div class="row-btns"><button class="btn btn-primary" data-exp-add="">${icon('plus')}직접 적기</button><button class="btn btn-secondary" data-view="upload">${icon('upload')}엑셀 올리기</button></div></div>`;
       return;
     }
     const total = b.lines.reduce((s, l) => s + lineKrw(l, b), 0);
@@ -1357,6 +1359,7 @@
           <div><span class="muted small">원화 결제</span><b>${won(krwSum)}</b></div>
         </div>
         <label class="rate">환율 <span>100${b.foreign === 'JPY' ? '엔' : ' ' + b.foreign} =</span><input id="budget-rate" inputmode="decimal" value="${per100}" aria-label="100${b.foreign} 당 원화"><span>원${b.rateDate ? ` · ${esc(b.rateDate)} 기준` : ''}</span></label>
+        <button class="btn btn-primary exp-add-main" data-exp-add="">${icon('plus')}경비 추가</button>
       </div>
       <div class="card">
         <h3 class="card-title">${icon('dash')}구분별 예산<span class="right">실제 ${won(spent)}</span></h3>
@@ -1383,14 +1386,118 @@
       ${groups.map(g => {
         const sub = g.lines.reduce((s, l) => s + lineKrw(l, b), 0);
         return `<div class="card">
-          <h3 class="card-title">${esc(g.day || '기타')}<span class="right">${won(sub)}</span></h3>
+          <h3 class="card-title">${esc(g.day || '기타')}<span class="right">${won(sub)}<button class="btn btn-secondary btn-sm exp-add" data-exp-add="${esc(g.day)}" aria-label="${esc(g.day || '기타')} 경비 추가">${icon('plus')}추가</button></span></h3>
           <ul class="exp">${g.lines.map(l => `<li>
-            <div class="exp-main"><span class="chip later">${esc(l.cat)}</span><b>${esc(l.name)}</b>${l.memo ? `<span class="muted small">${esc(l.memo)}</span>` : ''}${l.link ? `<a class="link small" href="${esc(l.link)}" target="_blank" rel="noopener">${icon('pin')}경로 보기</a>` : ''}</div>
+            <div class="exp-main"><span class="chip later">${esc(l.cat)}</span><button type="button" class="exp-name" data-exp-edit="${l.i}" aria-label="${esc(l.name)} 수정"><b>${esc(l.name)}</b>${icon('chev')}</button>${l.memo ? `<span class="muted small">${esc(l.memo)}</span>` : ''}${l.link ? `<a class="link small" href="${esc(l.link)}" target="_blank" rel="noopener">${icon('pin')}경로 보기</a>` : ''}</div>
             <div class="exp-num"><b>${won(lineKrw(l, b))}</b>${l.cur !== 'KRW' ? `<span class="muted small">${yen(l.unit, l.cur)}${l.qty !== 1 ? ` × ${l.qty}` : ''}</span>` : l.qty !== 1 ? `<span class="muted small">${won(l.unit)} × ${l.qty}</span>` : ''}
               <label class="actual"><span class="small muted">실제</span><input inputmode="numeric" data-actual="${l.i}" value="${l.actual ? Math.round(l.actual).toLocaleString() : ''}" placeholder="0" aria-label="${esc(l.name)} 실제 지출(원)"></label></div>
           </li>`).join('')}</ul>
         </div>`;
       }).join('')}`;
+  };
+
+  // ---------- 경비 고치기 · 추가 ----------
+  // 표의 '일차' 순서: 준비 → 1일차 … → 공통 (그 밖의 이름은 일차 뒤)
+  const dayRank = d => /준비/.test(d) ? 0 : parseInt(d, 10) || (/공통/.test(d) ? 999 : 500);
+  const ensureBudget = () => {
+    if (!state.extras) state.extras = {};
+    if (!state.extras.budget) { const cur = city().cur; state.extras.budget = { title: '여행 경비', subtitle: '1인 기준', rate: cur !== 'KRW' ? krwPer(cur) : null, rateDate: '', foreign: cur === 'KRW' ? 'JPY' : cur, lines: [] }; }
+    return state.extras.budget;
+  };
+  const curLabel = c => c === 'KRW' ? '원' : c === 'JPY' ? '엔' : c;
+  const openExpEditor = (i, day) => {
+    const b = state.extras && state.extras.budget, l = b && i != null ? b.lines[i] : null;
+    const foreign = b ? b.foreign : (city().cur === 'KRW' ? 'JPY' : city().cur);
+    const ds = days(), dayOpts = ['준비'].concat(ds.map((_, k) => `${k + 1}일차`), '공통');
+    (b ? b.lines : []).forEach(x => { if (x.day && !dayOpts.includes(x.day)) dayOpts.push(x.day); });
+    const d = l ? l.day : day != null && day !== '' ? day : (state.day && ds.includes(state.day) ? `${ds.indexOf(state.day) + 1}일차` : dayOpts[1] || '준비');
+    const cats = [...new Set(COST_CATS.slice(0, 4).concat('항공', (b ? b.lines : []).map(x => x.cat), '기타'))];
+    const cur = l ? l.cur : foreign;
+    const v = k => esc(l ? (l[k] == null ? '' : l[k]) : '');
+    const dlg = $('#detail');
+    dlg.innerHTML = `<form class="sheet-inner editor" id="exp-form" data-i="${l ? i : ''}" novalidate>
+      <div class="sheet-hero">
+        <div class="row"><b style="font-size:22px">${l ? '경비 수정' : '경비 추가'}</b><button type="button" class="icon-btn" data-close aria-label="닫기">${icon('x')}</button></div>
+        <label class="field"><span>항목</span><input name="name" maxlength="60" required value="${v('name')}" placeholder="예: 이치란 라멘 저녁" autocomplete="off" enterkeyhint="done"></label>
+      </div>
+      <div class="sheet-body">
+        <div class="field"><span>언제</span>
+          <div class="pills wrap ed-chips">${dayOpts.map(x => `<button type="button" class="pill ${x === d ? 'on' : ''}" data-xp-day="${esc(x)}">${esc(x === '준비' ? '출발 전' : x === '공통' ? '여행 내내' : x)}</button>`).join('')}</div>
+          <input type="hidden" name="day" value="${esc(d)}">
+        </div>
+        <div class="field"><span>구분</span>
+          <div class="pills wrap ed-chips">${cats.map(c => `<button type="button" class="pill ${l && l.cat === c ? 'on' : ''}" data-xp-cat="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+          <input name="cat" maxlength="20" value="${v('cat')}" placeholder="직접 입력" class="ed-cat-input">
+        </div>
+        <div class="field-row">
+          <div class="field"><span>금액</span>
+            <div class="xp-amt"><input name="unit" inputmode="decimal" value="${l && l.unit ? l.unit.toLocaleString() : ''}" placeholder="0" aria-label="금액">
+              <div class="xp-cur">${[...new Set([foreign, 'KRW'])].map(c => `<button type="button" class="${c === cur ? 'on' : ''}" data-xp-cur="${c}">${curLabel(c)}</button>`).join('')}</div></div>
+            <input type="hidden" name="cur" value="${esc(cur)}"></div>
+          <div class="field"><span>수량 · 인원</span>
+            <div class="xp-qty"><button type="button" data-xp-qty="-1" aria-label="하나 빼기">−</button><input name="qty" inputmode="numeric" value="${l ? l.qty : 1}" aria-label="수량"><button type="button" data-xp-qty="1" aria-label="하나 더하기">+</button></div></div>
+        </div>
+        <p class="xp-sum" id="xp-sum"></p>
+        <details class="more ed-more"${l && (l.memo || l.actual) ? ' open' : ''}><summary>메모 · 실제 지출</summary>
+          <label class="field"><span>메모</span><textarea name="memo" rows="2" maxlength="300">${v('memo')}</textarea></label>
+          <label class="field"><span>실제 쓴 돈 <i class="muted small">원 · 다녀와서 적어도 돼요</i></span><input name="actual" inputmode="numeric" value="${l && l.actual ? Math.round(l.actual).toLocaleString() : ''}" placeholder="0"></label>
+        </details>
+        <p class="warn" id="xp-error" hidden></p>
+      </div>
+      <div class="sheet-cta">
+        ${l ? `<button type="button" class="btn btn-danger" data-xp-delete>삭제</button>` : `<button type="button" class="btn btn-secondary" data-xp-again>저장하고 하나 더</button>`}
+        <button type="submit" class="btn btn-primary">${icon('check')}저장</button>
+      </div>
+    </form>`;
+    if (!dlg.open) dlg.showModal();
+    expSum();
+    if (!l && matchMedia('(min-width: 960px)').matches) dlg.querySelector('[name=name]').focus();
+  };
+  // 금액 × 수량을 원화로 미리 보여 준다
+  const expSum = () => {
+    const f = $('#exp-form'); if (!f) return;
+    const E = f.elements, unit = num(E.unit.value) || 0, qty = num(E.qty.value) || 0, cur = E.cur.value;
+    const b = state.extras && state.extras.budget, rate = cur === 'KRW' ? 1 : (b && b.rate) || krwPer(cur);
+    $('#xp-sum').innerHTML = unit && qty ? `합계 <b>${cur === 'KRW' ? won(unit * qty) : `${yen(unit * qty, cur)} ≈ ${rate ? won(unit * qty * rate) : '위 환율 칸을 채우면 원화로 계산해요'}`}</b>` : '';
+  };
+  const expClick = t => {
+    const f = $('#exp-form'); if (!f || !f.contains(t)) return false;
+    const E = f.elements;
+    if (t.dataset.xpDay != null) { E.day.value = t.dataset.xpDay; $$('[data-xp-day]', f).forEach(x => x.classList.toggle('on', x === t)); return true; }
+    if (t.dataset.xpCat != null) { const on = !t.classList.contains('on'); $$('[data-xp-cat]', f).forEach(x => x.classList.toggle('on', on && x === t)); E.cat.value = on ? t.dataset.xpCat : ''; return true; }
+    if (t.dataset.xpCur) { E.cur.value = t.dataset.xpCur; $$('[data-xp-cur]', f).forEach(x => x.classList.toggle('on', x === t)); expSum(); return true; }
+    if (t.dataset.xpQty) { E.qty.value = Math.max(1, (num(E.qty.value) || 1) + +t.dataset.xpQty); expSum(); return true; }
+    if (t.hasAttribute('data-xp-again')) { saveExp(f, 'again'); return true; }
+    if (t.hasAttribute('data-xp-delete')) {
+      const b = state.extras.budget, i = +f.dataset.i, l = b.lines[i];
+      remember(); b.lines.splice(i, 1); save(); $('#detail').close(); renderBudget(); render();
+      toast('경비를 지웠어요', l.name, null, true); return true;
+    }
+    return false;
+  };
+  const saveExp = (form, mode) => {
+    const E = form.elements, s = n => E[n].value.trim();
+    const err = msg => { const e = $('#xp-error'); e.textContent = msg; e.hidden = false; };
+    if (!s('name')) { E.name.focus(); return err('항목 이름을 적어 주세요.'); }
+    const unit = num(s('unit')), qty = num(s('qty')) || 1, act = num(s('actual'));
+    if (!(unit >= 0)) { E.unit.focus(); return err('금액을 숫자로 적어 주세요.'); }
+    remember();
+    const b = ensureBudget(), cur = s('cur') || 'KRW';
+    if (cur !== 'KRW' && !b.rate) b.rate = krwPer(cur) || null;
+    const data = { day: s('day'), cat: s('cat') || '기타', name: s('name'), unit, cur, qty, memo: s('memo'), actual: act > 0 ? act : null };
+    data.budget = cur === 'KRW' ? unit * qty : b.rate ? unit * qty * b.rate : 0;
+    const i = form.dataset.i === '' ? -1 : +form.dataset.i, old = i >= 0 ? b.lines[i] : null, moved = !old || old.day !== data.day;
+    const line = old ? Object.assign(old, data) : { link: '', ...data };
+    // 같은 일차 끝에 놓아 표 순서(준비 → 일차 → 공통)를 지킨다. 일차를 바꾸지 않았으면 제자리
+    if (moved) {
+      if (old) b.lines.splice(i, 1);
+      const r = dayRank(line.day); let at = b.lines.findIndex(x => dayRank(x.day) > r); if (at < 0) at = b.lines.length;
+      const last = b.lines.map(x => x.day).lastIndexOf(line.day); if (last >= 0) at = last + 1;
+      b.lines.splice(at, 0, line);
+    }
+    save(); renderBudget(); render();
+    toast(old ? '경비를 고쳤어요' : '경비를 추가했어요', `${line.name} · ${won(lineKrw(line, b))}`, null, true);
+    if (mode === 'again') openExpEditor(null, line.day); else $('#detail').close();
   };
 
   // ---------- 알림 ----------
@@ -1533,7 +1640,9 @@
     if (t.dataset.fixSeg) { openFix(t.dataset.fixSeg); return; }
     if (t.dataset.fixPick != null) { fixState.pick = +t.dataset.fixPick; $$('.fix-opt').forEach((b, i) => b.classList.toggle('on', i === fixState.pick)); return; }
     if (t.hasAttribute('data-apply-fix')) { applyFix(); return; }
-    if (editorClick(t)) return;
+    if (editorClick(t) || expClick(t)) return;
+    if (t.dataset.expAdd != null) { openExpEditor(null, t.dataset.expAdd); return; }
+    if (t.dataset.expEdit != null) { openExpEditor(+t.dataset.expEdit); return; }
     if (t.hasAttribute('data-undo')) { t.closest('.toast').remove(); undo(); return; }
     // 전체 일정에서는 포스트잇을 누르면 바로 고칠 수 있게 연다
     if (t.dataset.open) { if (state.view === 'schedule') openEditor(t.dataset.open); else openDetail(t.dataset.open); return; }
@@ -1572,6 +1681,7 @@
   });
   document.addEventListener('input', e => {
     const t = e.target;
+    if (t.form && t.form.id === 'exp-form') { expSum(); return; }
     if (!t.dataset.conv) return;
     const per = krwPer(city().cur); if (!per) return;
     const v = parseFloat(t.value.replace(/,/g, ''));
@@ -1583,6 +1693,7 @@
   });
   document.addEventListener('submit', e => {
     if (e.target.id === 'edit-form') { e.preventDefault(); saveEditor(e.target); return; }
+    if (e.target.id === 'exp-form') { e.preventDefault(); saveExp(e.target); return; }
     if (!e.target.matches('[data-check-add]')) return;
     e.preventDefault();
     const v = e.target.t.value.trim(); if (!v) return;
@@ -1622,9 +1733,9 @@
     state.items = []; state.extras = null; state.fired = {}; state.snooze = {}; store.set('presetDismissed', true); save(); toast('일정을 지웠어요'); setView('today');
   });
   // 바깥(빈 공간)을 누르면 닫되, 일정을 쓰는 중에는 실수로 날아가지 않게 닫지 않는다 (X · 저장으로만 닫힘)
-  $('#detail').addEventListener('click', e => { if (e.target === e.currentTarget && !$('#edit-form')) e.currentTarget.close(); });
+  $('#detail').addEventListener('click', e => { if (e.target === e.currentTarget && !$('#edit-form, #exp-form')) e.currentTarget.close(); });
   // Esc도 마찬가지: 쓰던 내용이 있으면 닫지 않는다
-  $('#detail').addEventListener('cancel', e => { const f = $('#edit-form'); if (f && editorDirty(f)) { e.preventDefault(); toast('작성 중인 일정이 있어요', '닫으려면 X를 눌러 주세요'); } });
+  $('#detail').addEventListener('cancel', e => { const f = $('#edit-form, #exp-form'); if (f && editorDirty(f)) { e.preventDefault(); toast(f.id === 'exp-form' ? '작성 중인 경비가 있어요' : '작성 중인 일정이 있어요', '닫으려면 X를 눌러 주세요'); } });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkAlerts(); render(true); } });
 
   // ---------- 시작 ----------
@@ -1706,7 +1817,7 @@
     if (changed) {
       if (!sync.first) toast('일정이 업데이트됐어요', `${d.updatedBy === 'site' ? '다른 기기' : 'Claude'}에서 바꾼 내용을 받았어요`);
       else if (sync.kind === 'firebase') toast('계정의 일정을 불러왔어요', `${incoming.items.length}개 일정`);
-      if ($('#detail').open && !$('#edit-form')) $('#detail').close();
+      if ($('#detail').open && !$('#edit-form, #exp-form')) $('#detail').close();
       render();
     }
     sync.first = false;
