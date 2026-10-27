@@ -545,8 +545,9 @@
     const tt = $('.timetable.single'); if (!tt) return;
     const col = $('.tt-col', tt), total = +col.style.getPropertyValue('--total');
     const tabbar = $('.tabbar'), bottom = tabbar && getComputedStyle(tabbar).display !== 'none' ? tabbar.getBoundingClientRect().height : 0;
-    const avail = window.innerHeight - bottom - (col.getBoundingClientRect().top + window.scrollY - Math.max(0, $('#sched-pills').getBoundingClientRect().top + window.scrollY - 8)) - 24;
-    tt.style.setProperty('--ppm', Math.max(0.5, Math.min(2.4, avail / total)).toFixed(3));
+    // 페이지 맨 위에서 스크롤 없이 시간표 끝까지 보이도록
+    const avail = window.innerHeight - bottom - (col.getBoundingClientRect().top + window.scrollY) - 18;
+    tt.style.setProperty('--ppm', Math.max(0.35, Math.min(2.4, avail / total)).toFixed(3));
   };
   // 칸이 낮아 두 줄이 안 들어가는 일정은 한 줄로 줄여 보여 준다
   const markCompact = () => $$('.timetable').forEach(tt => {
@@ -579,12 +580,7 @@
         const n = ds.indexOf(td) + 1, checks = checksHtml(n);
         const its = state.items.filter(i => i.date === td), segs = liveSegs().filter(sg => parseInt(sg.day, 10) === n && sg.level !== 'ok');
         $('#schedule-list').innerHTML = `<div class="sched-layout${checks ? '' : ' solo'}"><div class="day-group">
-            <div class="day-hero">
-              <div class="dh-num"><small>DAY</small><b>${n}</b></div>
-              <div class="dh-main"><h2>${fmtDate(td)}${td === t ? ' <span class="dh-today">오늘</span>' : ''}</h2>
-                <p>${its.length ? `${its[0].time} 시작 · ${its[its.length - 1].end || its[its.length - 1].time} 마무리 · 일정 ${its.length}개` : '아직 일정이 없어요'}${segs.length ? ` · <span class="dh-warn">확인할 이동 ${segs.length}곳</span>` : ''}</p></div>
-              <button class="btn btn-primary dh-add" data-add="${td}">${icon('plus')}추가</button>
-            </div>
+            <p class="tt-day-line"><b>${n}일차 · ${fmtDate(td)}</b>${td === t ? ' <span class="dh-today">오늘</span>' : ''}<span>${its.length ? `${its[0].time}–${its[its.length - 1].end || its[its.length - 1].time} · 일정 ${its.length}개` : '일정 없음'}</span>${segs.length ? `<span class="dh-warn">확인할 이동 ${segs.length}곳</span>` : ''}</p>
             ${timetable([td], t, now, true)}</div>${checks ? `<aside class="sched-side">${checks}</aside>` : ''}</div>`;
         fitTimetable();
       }

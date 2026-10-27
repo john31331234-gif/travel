@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Gaegu:wght@400;700&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=13">
+  <link rel="stylesheet" href="css/style.css?v=14">
 </head>
 <body>
   <div class="app">
@@ -61,18 +61,15 @@
 
       <!-- 전체 일정 -->
       <section class="view" id="view-schedule" hidden>
-        <header class="page-head">
-          <div>
-            <p class="eyebrow">엑셀에서 불러온 일정</p>
-            <h1 class="display">Schedule</h1>
-          </div>
-          <span class="btn-row">
-            <button class="btn btn-primary" data-add=""><svg><use href="#i-plus"/></svg>일정 추가</button>
-            <button class="btn btn-secondary" data-view="upload"><svg><use href="#i-upload"/></svg>엑셀</button>
+        <h1 class="sr-only">전체 일정</h1>
+        <header class="sched-bar">
+          <div class="pills sched-mode" id="sched-mode" role="tablist" aria-label="보기 방식" hidden></div>
+          <div class="pills sched-pills" id="sched-pills" role="tablist" aria-label="일차 선택" hidden></div>
+          <span class="sched-actions">
+            <button class="btn btn-primary" data-add=""><svg><use href="#i-plus"/></svg><span>일정 추가</span></button>
+            <button class="btn btn-secondary" data-view="upload" aria-label="엑셀"><svg><use href="#i-upload"/></svg><span>엑셀</span></button>
           </span>
         </header>
-        <div class="pills sched-mode" id="sched-mode" role="tablist" aria-label="보기 방식" hidden></div>
-        <div class="pills sched-pills" id="sched-pills" role="tablist" aria-label="일차 선택" hidden></div>
         <div id="schedule-list"></div>
       </section>
 
@@ -241,6 +238,6 @@
   <script src="vendor/firebase/firebase-app-compat.js"></script>
   <script src="vendor/firebase/firebase-auth-compat.js"></script>
   <script src="vendor/firebase/firebase-firestore-compat.js"></script>
-  <script src="js/app.js?v=13"></script>
+  <script src="js/app.js?v=14"></script>
 </body>
 </html>
