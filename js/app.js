@@ -571,7 +571,7 @@
         const tr = transportFor(it), lv = tr && tr.level !== 'ok' ? tr.level : '', st = statusOf(it, now), dur = s[1] - s[0];
         // 하루만 보일 때(폰)는 칸 길이에 맞춰 글자 크기를 고른다
         const size = ds.length === 1 ? (dur < 20 ? ' sz-xs' : dur < 35 ? ' sz-s' : dur < 70 ? ' sz-m' : ' sz-l') : '';
-        return `<button class="tt-block${dur < 25 ? ' short' : ''}${size}${clashOf(it, it.id) ? ' clash' : ''}" data-cat="${catKey(it.category)}" data-open="${esc(it.id)}"${lv ? ` data-level="${lv}"` : ''}${st === 'done' ? ' data-done' : ''}${state.flash === it.id ? ' data-flash' : ''}
+        return `<button class="tt-block${dur <= 35 ? ' short' : ''}${size}${clashOf(it, it.id) ? ' clash' : ''}" data-cat="${catKey(it.category)}" data-open="${esc(it.id)}"${lv ? ` data-level="${lv}"` : ''}${st === 'done' ? ' data-done' : ''}${state.flash === it.id ? ' data-flash' : ''}
           style="--t:${top(s[0])};--h:${dur};--lane:${lane};--of:${of}" title="${it.time}${it.end ? '~' + it.end : ''} ${esc(it.title)}">
           <small>${it.time}${it.end ? `<i>~${it.end}</i>` : ''}${lv ? `<em>${lv === 'late' ? '지연' : '빠듯'}</em>` : ''}</small><span>${esc(it.title)}</span><i class="tt-resize" aria-hidden="true"></i></button>`;
       }).join('');
@@ -583,11 +583,11 @@
     const ov = overlaps().filter(x => ds.includes(x.date));
     const stam = state.settings.stamina || 'normal';
     const stamHtml = `<div class="stamina" role="radiogroup" aria-label="내 체력"><span>내 체력</span>${STAMINA.map(([k, l]) => `<button class="pill" role="radio" aria-checked="${k === stam}" aria-selected="${k === stam}" data-stamina="${k}">${l}</button>`).join('')}</div>`;
-    return `${stamHtml}${ov.length ? `<p class="tt-overlap">${icon('clock')}<span>겹친 일정이 <b>${ov.length}개</b> 있어요. 일정은 겹칠 수 없어요.</span><button class="btn btn-sm btn-primary" data-fix-overlaps>자동 정리</button></p>` : ''}${segs.length ? `<p class="tt-sum"><span class="chip soon">지연 ${cnt('late')}</span><span class="chip warn">빠듯 ${cnt('tight')}</span><span class="muted small">표시된 칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</span></p>` : '<p class="tt-sum muted small">칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</p>'}
+    return `<div class="tt-toolbar">${stamHtml}${segs.length ? `<div class="tt-issues"><span class="tt-issues-l">이동 점검</span><span class="chip soon">지연 ${cnt('late')}</span><span class="chip warn">빠듯 ${cnt('tight')}</span></div>` : ''}</div>${ov.length ? `<p class="tt-overlap">${icon('clock')}<span>겹친 일정이 <b>${ov.length}개</b> 있어요. 일정은 겹칠 수 없어요.</span><button class="btn btn-sm btn-primary" data-fix-overlaps>자동 정리</button></p>` : ''}<p class="tt-hint">칸을 누르면 수정 · 빈 곳을 누르면 그 시간에 추가 · 칸을 끌어서 시간 이동</p>
       <div class="timetable${ds.length === 1 ? ' one' : ''}" style="--days:${ds.length};--startH:${startH}">
         <div class="tt-head"><span class="tt-corner">시간</span>${ds.map((d, i) => `<button class="tt-day${d === t ? ' today' : ''}" data-sday="${d}" data-smode-to="board">${days().indexOf(d) + 1}일차 <small>${fmtShort(d)}</small></button>`).join('')}</div>
         <div class="tt-info"><span class="tt-corner">하루</span>${ds.map(d => { const L = dayLoad(d), C = dayCost(d);
-          return `<div class="tt-dinfo">${L ? `<div class="load ${L.key}" title="부담 점수 ${L.score}"><b>${L.face} ${L.label}</b><span class="load-bar"><i style="width:${L.pct}%"></i></span></div><p class="load-why">${L.why.slice(0, 3).map(esc).join(' · ')}</p>` : ''}${C ? `<p class="day-cost">${icon('wallet')}<b>${won(C.budget)}</b>${C.actual ? `<span>실제 ${won(C.actual)}</span>` : ''}</p>` : ''}</div>`; }).join('')}</div>
+          return `<div class="tt-dinfo">${L ? `<div class="load ${L.key}" title="부담 점수 ${L.score}"><span class="load-chip">${L.face} ${L.label}</span><span class="load-bar"><i style="width:${L.pct}%"></i></span></div><ul class="load-why">${L.why.slice(0, 3).map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}${C ? `<p class="day-cost"><span>예상 경비</span><b>${won(C.budget)}</b>${C.actual ? `<em>실제 ${won(C.actual)}</em>` : ''}</p>` : ''}</div>`; }).join('')}</div>
         <div class="tt-body"><div class="tt-hours" style="--total:${total}">${hours}</div>${ds.map(col).join('')}</div>
       </div>`;
   };
