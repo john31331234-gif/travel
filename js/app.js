@@ -939,12 +939,19 @@
     // 도착 목표는 원래 계획의 시작이나 끝 중 하나에 맞춰져 있다
     const tShift = target === toMin(B.time) ? startShift : B.end && target === toMin(B.end) ? (it.end ? toMin(it.end) : toMin(B.end) + startShift) - toMin(B.end) : 0;
     // 출발은 앞 일정이 끝나는 때거나, 이 일정 안의 어느 때다
-    const prev = B.prevId && state.items.find(i => i.id === B.prevId);
-    const dShift = B.prevEnd && dep === toMin(B.prevEnd) ? (prev && prev.end ? toMin(prev.end) - dep : 0) : dep >= toMin(B.time) ? startShift : 0;
+    // 출발은 앞 일정이 끝나는 때거나, 이 일정 안의 어느 때다.
+    // 앞에 이동 일정을 새로 넣었다면 그 이동 일정이 시작할 때 출발한다
+    const before = state.items.filter(i => i.date === it.date && i.time < it.time).pop();
+    const linked = id => state.extras.transport.segs.some(x => x !== sg && x.itemId === id);
+    let dShift = 0;
+    if (dep < toMin(B.time) || (B.prevEnd && dep === toMin(B.prevEnd))) {
+      if (before && before.id !== B.prevId && catKey(before.category) === 'move' && !linked(before.id)) dShift = toMin(before.time) - dep;
+      else if (before && before.id === B.prevId && before.end) dShift = toMin(before.end) - dep;
+    } else if (dep >= toMin(B.time)) dShift = startShift;
     if (!tShift && !dShift) return sg;
     const slack = sg.slack + tShift - dShift, level = slack < 0 ? 'late' : slack < 10 ? 'tight' : 'ok';
     return { ...sg, dep: addMin(sg.dep, dShift), arr: addMin(sg.arr, dShift), slack, level, verdict: LEVEL[level][1], edited: true,
-      note: `고친 계획 기준 여유 ${slack}분${level === 'ok' ? ' · 해결됨' : sg.note ? ' · ' + sg.note : ''}` };
+      note: `고친 계획 기준 여유 ${slack}분${level === 'ok' ? ' · 해결됨' : ` · 이동에 ${sg.mins}분 걸려요 → ${addMin(sg.dep, dShift - (10 - slack))}까지 출발하거나 ${it.title} 시작을 ${10 - slack}분 늦추면 해결`}` };
   };
   const liveSegs = () => { const tr = state.extras && state.extras.transport; if (!tr) return []; linkSegs(); return tr.segs.map(liveSeg).filter(Boolean); };
   const transportFor = it => {
