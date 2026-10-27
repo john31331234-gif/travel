@@ -526,16 +526,16 @@
         const tr = transportFor(it), lv = tr && tr.level !== 'ok' ? tr.level : '', st = statusOf(it, now), dur = s[1] - s[0];
         return `<button class="tt-block${dur < 25 ? ' short' : ''}" data-cat="${catKey(it.category)}" data-open="${esc(it.id)}"${lv ? ` data-level="${lv}"` : ''}${st === 'done' ? ' data-done' : ''}${state.flash === it.id ? ' data-flash' : ''}
           style="--t:${top(s[0])};--h:${dur};--lane:${lane};--of:${of}" title="${it.time}${it.end ? '~' + it.end : ''} ${esc(it.title)}">
-          <small>${it.time}${it.end ? `<i>~${it.end}</i>` : ''}${lv ? `<em>${lv === 'late' ? '지연' : '빠듯'}</em>` : ''}</small><span>${esc(it.title)}</span></button>`;
+          <span class="tt-ico" aria-hidden="true">${CAT_ICON[catKey(it.category)]}</span><span class="tt-txt"><b>${esc(it.title)}</b><small>${it.time}${it.end ? `<i> – ${it.end}</i>` : ''}</small></span>${lv ? `<em>${lv === 'late' ? '지연' : '빠듯'}</em>` : ''}</button>`;
       }).join('');
       const nowLine = d === t ? (() => { const m = toMin(timeIn(now, city().tz)); return m >= startH * 60 && m <= endH * 60 ? `<i class="tt-now" style="--t:${top(m)}"></i>` : ''; })() : '';
       return `<div class="tt-col" data-tt-date="${d}" style="--total:${total}">${blocks}${nowLine}</div>`;
     };
-    const hours = Array.from({ length: endH - startH }, (_, i) => `<span style="--t:${i * 60}">${(startH + i) % 24}:00</span>`).join('');
+    const hours = Array.from({ length: endH - startH }, (_, i) => `<span style="--t:${i * 60}">${pad((startH + i) % 24)}:00</span>`).join('');
     const segs = liveSegs().filter(s => !single || parseInt(s.day, 10) === days().indexOf(ds[0]) + 1), cnt = k => segs.filter(s => s.level === k).length;
-    return `${single ? '' : segs.length ? `<p class="tt-sum"><span class="chip soon">지연 ${cnt('late')}</span><span class="chip warn">빠듯 ${cnt('tight')}</span><span class="muted small">표시된 칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</span></p>` : '<p class="tt-sum muted small">칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</p>'}
+    return `${single ? '' : `<p class="tt-sum">${segs.length ? `<span class="tt-stat late">지연 <b>${cnt('late')}</b></span><span class="tt-stat tight">빠듯 <b>${cnt('tight')}</b></span>` : ''}<span class="tt-hint">칸을 누르면 수정 · 빈 곳을 누르면 그 시간에 추가</span></p>`}
       <div class="timetable${single ? ' single' : ''}" style="--days:${ds.length};--startH:${startH}">
-        <div class="tt-head"><span class="tt-corner">시간</span>${ds.map(d => `<button class="tt-day${d === t ? ' today' : ''}" ${single ? `data-tday="all"` : `data-tday="${d}"`}>${days().indexOf(d) + 1}일차 <small>${fmtShort(d)}${single ? ' · 전체 보기' : ''}</small></button>`).join('')}</div>
+        ${single ? '' : `<div class="tt-head"><span class="tt-corner"></span>${ds.map(d => `<button class="tt-day${d === t ? ' today' : ''}" data-tday="${d}"><b>${days().indexOf(d) + 1}일차</b><small>${fmtShort(d)}</small></button>`).join('')}</div>`}
         <div class="tt-body"><div class="tt-hours" style="--total:${total}">${hours}</div>${ds.map(col).join('')}</div>
       </div>`;
   };
@@ -548,7 +548,12 @@
     const avail = window.innerHeight - bottom - (col.getBoundingClientRect().top + window.scrollY - Math.max(0, $('#sched-pills').getBoundingClientRect().top + window.scrollY - 8)) - 24;
     tt.style.setProperty('--ppm', Math.max(0.5, Math.min(2.4, avail / total)).toFixed(3));
   };
-  window.addEventListener('resize', () => { if (state.view === 'schedule') fitTimetable(); });
+  // 칸이 낮아 두 줄이 안 들어가는 일정은 한 줄로 줄여 보여 준다
+  const markCompact = () => $$('.timetable').forEach(tt => {
+    const ppm = parseFloat(tt.style.getPropertyValue('--ppm') || getComputedStyle(tt).getPropertyValue('--ppm')) || 1;
+    $$('.tt-block', tt).forEach(b => { const h = +b.style.getPropertyValue('--h') * ppm; b.classList.toggle('compact', h < 40); b.classList.toggle('tiny', h < 24); });
+  });
+  window.addEventListener('resize', () => { if (state.view === 'schedule') { fitTimetable(); markCompact(); } });
 
   // ---------- 화면: 전체 일정 ----------
   const renderSchedule = () => {
@@ -568,15 +573,22 @@
       // 시간표: '전체'는 모든 일차를 나란히, 일차 버튼은 그날 하루를 한 화면에
       if (state.ttDay !== 'all' && !ds.includes(state.ttDay)) state.ttDay = ds.includes(t) ? t : (ds.find(d => d >= t) || ds[0]);
       const td = state.ttDay;
-      pills.innerHTML = [['all', '전체', `${ds.length}일`]].concat(ds.map((x, i) => [x, `${i + 1}일차`, fmtShort(x)])).map(([k, l, sm]) => `<button class="pill" role="tab" aria-selected="${k === td}" data-tday="${k}">${l}<small>${sm}</small></button>`).join('');
+      pills.innerHTML = [['all', '전체', `${ds.length}일`]].concat(ds.map((x, i) => [x, `${i + 1}일차`, fmtShort(x)])).map(([k, l, sm]) => `<button class="pill${k === t ? ' is-today' : ''}" role="tab" aria-selected="${k === td}" data-tday="${k}">${l}<small>${sm}</small></button>`).join('');
       if (td === 'all') $('#schedule-list').innerHTML = timetable(ds, t, now);
       else {
         const n = ds.indexOf(td) + 1, checks = checksHtml(n);
+        const its = state.items.filter(i => i.date === td), segs = liveSegs().filter(sg => parseInt(sg.day, 10) === n && sg.level !== 'ok');
         $('#schedule-list').innerHTML = `<div class="sched-layout${checks ? '' : ' solo'}"><div class="day-group">
-            <div class="day-head">${n}일차 <small>${fmtDate(td)}${td === t ? ' · 오늘' : ''}</small><button class="link add-day" data-add="${td}" aria-label="${fmtShort(td)}에 일정 추가">${icon('plus')}추가</button></div>
+            <div class="day-hero">
+              <div class="dh-num"><small>DAY</small><b>${n}</b></div>
+              <div class="dh-main"><h2>${fmtDate(td)}${td === t ? ' <span class="dh-today">오늘</span>' : ''}</h2>
+                <p>${its.length ? `${its[0].time} 시작 · ${its[its.length - 1].end || its[its.length - 1].time} 마무리 · 일정 ${its.length}개` : '아직 일정이 없어요'}${segs.length ? ` · <span class="dh-warn">확인할 이동 ${segs.length}곳</span>` : ''}</p></div>
+              <button class="btn btn-primary dh-add" data-add="${td}">${icon('plus')}추가</button>
+            </div>
             ${timetable([td], t, now, true)}</div>${checks ? `<aside class="sched-side">${checks}</aside>` : ''}</div>`;
         fitTimetable();
       }
+      markCompact();
       state.flash = null; return;
     }
     // 일차 버튼으로 하루씩 본다. 처음엔 오늘(여행 중) 또는 다가오는 날
@@ -842,6 +854,7 @@
   // 꼭 필요한 것(이름 · 날짜 · 시간 · 구분)만 위에 두고, 날짜 · 시간 · 구분은 눌러서 고른다.
   const toMin = t => t.split(':').reduce((h, m) => h * 60 + +m);
   const addMin = (t, m) => { const x = ((toMin(t) + m) % 1440 + 1440) % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`; };
+  const CAT_ICON = { move: '🚃', food: '🍜', sight: '📸', rest: '🛏️', onsen: '♨️', prep: '🧳', free: '☕', etc: '📍', none: '📍' };
   const CAT_PRESETS = ['이동', '식사', '관광', '휴식 · 숙소', '온천', '준비 · 수속', '여유 시간'];
   // 그날 마지막 일정이 끝난 뒤를 새 일정 시작으로 제안한다
   const nextFreeTime = (date, before) => {
