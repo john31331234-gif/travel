@@ -485,17 +485,19 @@
     const path = pts.map((p, i) => { if (!i) return `M${p.x},${p.y}`; const q = pts[i - 1], mx = (q.x + p.x) / 2; return `C${mx},${q.y} ${mx},${p.y} ${p.x},${p.y}`; }).join(' ');
     // 문제점은 옆 칸에 따로 있으니, 계획표에서는 해당 포스트잇에 지연 · 빠듯 표시만 단다
     const note = it => { const st = statusOf(it, now), tr = transportFor(it), lv = tr && tr.level !== 'ok' ? tr.level : '';
-      return `<button class="j-note" data-cat="${catKey(it.category)}" data-open="${esc(it.id)}"${st === 'done' ? ' data-done' : ''}${lv ? ` data-level="${lv}"` : ''}><b>${it.time}${lv ? `<em>${lv === 'late' ? '지연' : '빠듯'}</em>` : ''}</b><span>${esc(it.title)}</span>${it.category ? `<i>${esc(it.category)}</i>` : ''}</button>`; };
+      return `<button class="j-note" data-cat="${catKey(it.category)}" data-open="${esc(it.id)}"${st === 'done' ? ' data-done' : ''}${state.flash === it.id ? ' data-flash' : ''}${lv ? ` data-level="${lv}"` : ''}><b>${it.time}${lv ? `<em>${lv === 'late' ? '지연' : '빠듯'}</em>` : ''}</b><span>${esc(it.title)}</span>${it.category ? `<i>${esc(it.category)}</i>` : ''}</button>`; };
+    // 단계마다 '+' : 그 단계 마지막 일정이 끝난 뒤 시간으로 새 일정을 연다
+    const addBtn = c => { const last = c.items[c.items.length - 1]; return `<button class="j-add" data-add="${d}" data-at="${last.end || addMin(last.time, 60)}" aria-label="${c.label}에 일정 추가">${icon('plus')}</button>`; };
     const face = i => `<span class="j-face-s" title="여유도 ${pts[i].v.toFixed(1)} / 3">${FACE[Math.round(pts[i].v)]}</span>`;
     const grid = `style="grid-template-columns:var(--jl, 64px) repeat(${cols.length}, minmax(0, 1fr))"`;
     // 넓은 화면은 단계를 가로로, 폰은 단계를 세로로 쌓아 하루를 한 번에 본다
     return `<div class="journey" aria-label="${n}일차 여정 지도"><div class="j-grid" ${grid}>
       <div class="j-row-label">단계</div>${cols.map(c => `<div class="j-stage" data-stage="${c.key}">${c.label}<small>${c.items.length}개</small></div>`).join('')}
-      <div class="j-row-label">행동</div>${cols.map(c => `<div class="j-cell">${c.items.map(note).join('')}</div>`).join('')}
+      <div class="j-row-label">행동</div>${cols.map(c => `<div class="j-cell">${c.items.map(note).join('')}${addBtn(c)}</div>`).join('')}
       <div class="j-row-label">컨디션</div><div class="j-curve" style="grid-column: span ${cols.length}"><svg viewBox="0 0 ${cols.length * W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${path}" class="j-line" vector-effect="non-scaling-stroke"/></svg>
         ${pts.map((p, i) => `<span class="j-face" style="left:${(i + 0.5) / cols.length * 100}%;top:calc(16px + ${(p.y / H).toFixed(3)} * (100% - 32px))" title="여유도 ${p.v.toFixed(1)} / 3">${FACE[Math.round(p.v)]}</span>`).join('')}</div>
     </div>
-    <div class="j-stack">${cols.map((c, i) => `<div class="j-srow"><div class="j-stage" data-stage="${c.key}">${c.label}<small>${c.items.length}개</small>${face(i)}</div><div class="j-snotes">${c.items.map(note).join('')}</div></div>`).join('')}</div>
+    <div class="j-stack">${cols.map((c, i) => `<div class="j-srow"><div class="j-stage" data-stage="${c.key}">${c.label}<small>${c.items.length}개</small>${face(i)}</div><div class="j-snotes">${c.items.map(note).join('')}${addBtn(c)}</div></div>`).join('')}</div>
     </div>`;
   };
 
@@ -523,6 +525,7 @@
         </div>
         ${checks ? `<aside class="sched-side">${checks}</aside>` : ''}
       </div>`;
+    state.flash = null;
   };
 
   // ---------- 위젯 ----------
@@ -767,52 +770,87 @@
   };
 
   // ---------- 일정 추가 · 수정 ----------
+  // 꼭 필요한 것(이름 · 날짜 · 시간 · 구분)만 위에 두고, 날짜 · 시간 · 구분은 눌러서 고른다.
   const toMin = t => t.split(':').reduce((h, m) => h * 60 + +m);
-  let deleteArmed = null;
-  const openEditor = (id, date) => {
+  const addMin = (t, m) => { const x = ((toMin(t) + m) % 1440 + 1440) % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`; };
+  const CAT_PRESETS = ['이동', '식사', '관광', '휴식 · 숙소', '온천', '준비 · 수속', '여유 시간'];
+  // 그날 마지막 일정이 끝난 뒤를 새 일정 시작으로 제안한다
+  const nextFreeTime = (date, before) => {
+    const list = state.items.filter(i => i.date === date && (!before || i.time < before));
+    const last = list[list.length - 1];
+    return last ? (last.end || addMin(last.time, 60)) : '09:00';
+  };
+  let undoBuf = null;
+  const remember = () => { undoBuf = JSON.stringify(state.items); };
+  const openEditor = (id, date, at) => {
     const it = id ? state.items.find(i => i.id === id) : null;
-    const dlg = $('#detail');
-    const d = it ? it.date : (date || state.day || todayStr());
-    const cats = [...new Set(state.items.map(i => i.category).filter(Boolean))];
+    const dlg = $('#detail'), ds = days();
+    const d = it ? it.date : (date || (state.view === 'schedule' ? state.schedDay : state.day) || ds[0] || todayStr());
+    const time = it ? it.time : (at || nextFreeTime(d));
+    const cats = [...new Set(CAT_PRESETS.concat(state.items.map(i => i.category).filter(Boolean)))];
     const lead = it ? (it.remind === undefined ? 'default' : it.remind === null ? 'off' : String(it.remind)) : 'default';
     const v = k => esc(it ? (it[k] || '') : '');
-    dlg.innerHTML = `<form class="sheet-inner" id="edit-form" novalidate>
+    const moreOpen = it && (it.memo || it.mapUrl || it.remind !== undefined);
+    dlg.innerHTML = `<form class="sheet-inner editor" id="edit-form" data-id="${it ? esc(it.id) : ''}" novalidate>
       <div class="sheet-hero">
         <div class="row"><b style="font-size:22px">${it ? '일정 수정' : '새 일정'}</b><button type="button" class="icon-btn" data-close aria-label="닫기">${icon('x')}</button></div>
-        <label class="field"><span>일정 이름</span><input id="ed-title" name="title" maxlength="60" required value="${v('title')}" placeholder="예: 다자이후 텐만구 참배"></label>
+        <label class="field"><span>일정 이름</span><input id="ed-title" name="title" maxlength="60" required value="${v('title')}" placeholder="예: 다자이후 텐만구 참배" autocomplete="off" enterkeyhint="done"></label>
       </div>
       <div class="sheet-body">
-        <div class="field-row three">
-          <label class="field"><span>날짜</span><input id="ed-date" type="date" name="date" required value="${d}"></label>
-          <label class="field"><span>시작</span><input id="ed-time" type="time" name="time" required value="${it ? it.time : ''}"></label>
-          <label class="field"><span>종료 <i class="muted small">선택</i></span><input id="ed-end" type="time" name="end" value="${it && it.end ? it.end : ''}"></label>
+        <div class="field"><span>날짜</span>
+          <div class="pills wrap ed-chips">${ds.map((x, i) => `<button type="button" class="pill ${x === d ? 'on' : ''}" data-ed-date="${x}">${i + 1}일차 <small>${fmtShort(x)}</small></button>`).join('')}
+            <label class="pill ed-date-other ${ds.includes(d) ? '' : 'on'}">${ds.length ? '다른 날' : '날짜'}<input id="ed-date" type="date" name="date" required value="${d}"></label></div>
         </div>
         <div class="field-row">
-          <label class="field"><span>장소 <i class="muted small">선택</i></span><input id="ed-place" name="place" maxlength="120" value="${v('place')}" placeholder="주소나 가게 이름"></label>
-          <label class="field"><span>구분 <i class="muted small">선택</i></span><input id="ed-category" name="category" list="cat-list" maxlength="20" value="${v('category')}" placeholder="이동 · 식사 · 관광"><datalist id="cat-list">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist></label>
+          <div class="field"><span>시작</span><input id="ed-time" type="time" name="time" required value="${time}">
+            <div class="ed-nudge">${[-30, -10, 10, 30].map(m => `<button type="button" data-ed-nudge="${m}">${m > 0 ? '+' : '−'}${Math.abs(m)}분</button>`).join('')}</div></div>
+          <div class="field"><span>끝 <i class="muted small">선택</i></span><input id="ed-end" type="time" name="end" value="${it && it.end ? it.end : ''}">
+            <div class="ed-nudge">${[30, 60, 90, 120].map(m => `<button type="button" data-ed-dur="${m}">${m < 60 ? m + '분' : m / 60 + '시간'}</button>`).join('')}<button type="button" data-ed-dur="0">없음</button></div></div>
         </div>
-        <label class="field"><span>알림</span><select id="ed-remind" name="remind">
-          <option value="default" ${lead === 'default' ? 'selected' : ''}>기본 (${fmtLead(state.settings.lead).replace(' 알림', '')})</option>
-          ${[['off', '끔'], ['0', '정각'], ['5', '5분 전'], ['10', '10분 전'], ['30', '30분 전'], ['60', '1시간 전'], ['120', '2시간 전']].map(([k, l]) => `<option value="${k}" ${lead === k ? 'selected' : ''}>${l}</option>`).join('')}
-        </select></label>
-        <label class="field"><span>메모 <i class="muted small">선택</i></span><textarea id="ed-memo" name="memo" rows="3" maxlength="500">${v('memo')}</textarea></label>
-        <label class="field"><span>지도 링크 <i class="muted small">선택 · 비우면 장소로 검색</i></span><input id="ed-map" type="url" name="map" value="${v('mapUrl')}" placeholder="https://maps.google.com/..."></label>
+        <div class="field"><span>구분</span>
+          <div class="pills wrap ed-chips">${cats.map(c => `<button type="button" class="pill ${it && it.category === c ? 'on' : ''}" data-ed-cat="${esc(c)}" data-cat="${catKey(c)}">${esc(c)}</button>`).join('')}</div>
+          <input id="ed-category" name="category" maxlength="20" value="${v('category')}" placeholder="직접 입력" class="ed-cat-input">
+        </div>
+        <label class="field"><span>장소 <i class="muted small">선택 · 지도 검색에 써요</i></span><input id="ed-place" name="place" maxlength="120" value="${v('place')}" placeholder="주소나 가게 이름"></label>
+        <details class="more ed-more"${moreOpen ? ' open' : ''}><summary>메모 · 알림 · 지도 링크</summary>
+          <label class="field"><span>메모</span><textarea id="ed-memo" name="memo" rows="3" maxlength="500">${v('memo')}</textarea></label>
+          <label class="field"><span>알림</span><select id="ed-remind" name="remind">
+            <option value="default" ${lead === 'default' ? 'selected' : ''}>기본 (${fmtLead(state.settings.lead).replace(' 알림', '')})</option>
+            ${[['off', '끔'], ['0', '정각'], ['5', '5분 전'], ['10', '10분 전'], ['30', '30분 전'], ['60', '1시간 전'], ['120', '2시간 전']].map(([k, l]) => `<option value="${k}" ${lead === k ? 'selected' : ''}>${l}</option>`).join('')}
+          </select></label>
+          <label class="field"><span>지도 링크 <i class="muted small">비우면 장소로 검색</i></span><input id="ed-map" type="url" name="map" value="${v('mapUrl')}" placeholder="https://maps.google.com/..."></label>
+        </details>
         <p class="warn" id="ed-error" hidden></p>
       </div>
       <div class="sheet-cta">
-        ${it ? `<button type="button" class="btn btn-danger" id="ed-delete" data-id="${esc(it.id)}">삭제</button>` : ''}
+        ${it ? `<button type="button" class="btn btn-danger" id="ed-delete" data-id="${esc(it.id)}">삭제</button><button type="button" class="btn btn-secondary" data-ed-copy>복제</button>`
+          : `<button type="button" class="btn btn-secondary" data-ed-again>저장하고 하나 더</button>`}
         <button type="submit" class="btn btn-primary">${icon('check')}저장</button>
       </div>
     </form>`;
     if (!dlg.open) dlg.showModal();
-    deleteArmed = null;
-    $('#ed-title').focus();
+    // 폰에서는 키보드가 바로 올라오면 시트가 가려지므로 넓은 화면에서만 이름 칸에 바로 커서를 둔다
+    if (!it && matchMedia('(min-width: 960px)').matches) $('#ed-title').focus();
   };
 
-  const saveEditor = form => {
+  // 편집 시트 안의 버튼들: 날짜 · 시간 · 구분 고르기
+  const editorClick = t => {
+    const f = $('#edit-form'); if (!f || !f.contains(t)) return false;
+    const E = f.elements;
+    if (t.dataset.edDate) { E.date.value = t.dataset.edDate; $$('[data-ed-date]', f).forEach(b => b.classList.toggle('on', b === t)); $('.ed-date-other', f).classList.remove('on'); return true; }
+    if (t.dataset.edNudge) { if (/^\d{2}:\d{2}$/.test(E.time.value)) { const dur = /^\d{2}:\d{2}$/.test(E.end.value) ? toMin(E.end.value) - toMin(E.time.value) : null; E.time.value = addMin(E.time.value, +t.dataset.edNudge); if (dur != null) E.end.value = addMin(E.time.value, dur); } return true; }
+    if (t.dataset.edDur) { E.end.value = +t.dataset.edDur && /^\d{2}:\d{2}$/.test(E.time.value) ? addMin(E.time.value, +t.dataset.edDur) : ''; return true; }
+    if (t.dataset.edCat != null) { const on = !t.classList.contains('on'); $$('[data-ed-cat]', f).forEach(b => b.classList.toggle('on', on && b === t)); E.category.value = on ? t.dataset.edCat : ''; return true; }
+    if (t.hasAttribute('data-ed-copy')) { saveEditor(f, 'copy'); return true; }
+    if (t.hasAttribute('data-ed-again')) { saveEditor(f, 'again'); return true; }
+    return false;
+  };
+
+  // mode: 'again' 저장 후 같은 날 새 일정 하나 더 · 'copy' 고치던 일정을 복제
+  const saveEditor = (form, mode) => {
     const f = n => form.elements[n].value.trim();
     const err = msg => { const e = $('#ed-error'); e.textContent = msg; e.hidden = false; };
-    if (!f('title')) return err('일정 이름을 적어 주세요.');
+    if (!f('title')) { $('#ed-title').focus(); return err('일정 이름을 적어 주세요.'); }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(f('date'))) return err('날짜를 골라 주세요.');
     if (!/^\d{2}:\d{2}$/.test(f('time'))) return err('시작 시간을 골라 주세요.');
     const map = f('map');
@@ -822,27 +860,37 @@
     if (end) { const a = toMin(f('time')), b = toMin(end); duration = b > a ? b - a : b < a ? b + 1440 - a : null; }
     const r = f('remind');
     const data = { date: f('date'), time: f('time'), end, duration, title: f('title'), place: f('place'), category: f('category'), memo: form.elements.memo.value.trim(), mapUrl: map, remind: r === 'default' ? undefined : r === 'off' ? null : +r };
-    const editingId = $('#ed-delete') ? $('#ed-delete').dataset.id : null;
+    const editingId = mode === 'copy' ? null : form.dataset.id || null;
+    remember();
     let it = editingId ? state.items.find(i => i.id === editingId) : null;
     if (it) Object.assign(it, data);
-    else { it = { id: 'u' + Date.now().toString(36), ...data }; state.items.push(it); }
+    else { it = { id: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), ...data }; state.items.push(it); }
     state.items.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     delete state.fired[it.id]; delete state.snooze[it.id];
     const l = leadOf(it); if (l != null && startMs(it) - l * 60000 < Date.now() - 60000) state.fired[it.id] = true;
-    state.day = it.date;
+    state.day = state.schedDay = it.date;
+    state.flash = it.id;
     save();
-    $('#detail').close();
-    toast(editingId ? '일정을 고쳤어요' : '일정을 추가했어요', `${fmtShort(it.date)} ${it.time} · ${it.title}`);
+    toast(editingId ? '일정을 고쳤어요' : mode === 'copy' ? '일정을 복제했어요' : '일정을 추가했어요', `${fmtShort(it.date)} ${it.time} · ${it.title}`, null, true);
     render();
+    // 하나 더: 같은 날, 방금 일정이 끝난 뒤 시간으로 빈 시트를 다시 연다
+    if (mode === 'again') openEditor(null, it.date, it.end || addMin(it.time, 60));
+    else if (mode === 'copy') openEditor(it.id);
+    else $('#detail').close();
   };
 
   const deleteItem = btn => {
-    if (!deleteArmed) { btn.textContent = '한 번 더 누르면 삭제'; deleteArmed = setTimeout(() => { deleteArmed = null; btn.textContent = '삭제'; }, 4000); return; }
-    clearTimeout(deleteArmed); deleteArmed = null;
     const it = state.items.find(i => i.id === btn.dataset.id);
+    remember();
     state.items = state.items.filter(i => i.id !== btn.dataset.id);
     save(); $('#detail').close(); render();
-    if (it) toast('일정을 삭제했어요', it.title);
+    if (it) toast('일정을 삭제했어요', it.title, null, true);
+  };
+
+  const undo = () => {
+    if (!undoBuf) return;
+    state.items = JSON.parse(undoBuf); undoBuf = null;
+    save(); render(); toast('되돌렸어요');
   };
 
   // 지금 일정을 엑셀로 저장(여행경비 시트가 있으면 실제 지출까지 함께)
@@ -1023,12 +1071,12 @@
     }
   };
 
-  const toast = (title, body, it) => {
+  const toast = (title, body, it, canUndo) => {
     const wrap = $('#toasts');
     const el = document.createElement('div');
     el.className = 'toast'; el.setAttribute('role', 'status');
     el.innerHTML = `<span class="tm">${icon('plane')}</span><div><b>${esc(title)}</b>${body ? `<span class="muted small">${esc(body)}</span>` : ''}
-      ${it ? `<div class="acts"><a href="${itemMap(it)}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:700">지도 열기</a><button data-snooze="${esc(it.id)}">${SNOOZE_MIN}분 뒤 다시</button></div>` : ''}</div>
+      ${it ? `<div class="acts"><a href="${itemMap(it)}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:700">지도 열기</a><button data-snooze="${esc(it.id)}">${SNOOZE_MIN}분 뒤 다시</button></div>` : ''}${canUndo ? '<div class="acts"><button data-undo>되돌리기</button></div>' : ''}</div>
       <button class="del" aria-label="닫기" style="width:32px;height:32px;display:grid;place-items:center">${icon('x')}</button>`;
     wrap.prepend(el);
     const close = () => el.remove();
@@ -1068,8 +1116,11 @@
     const t = e.target.closest('button, a');
     if (!t) return;
     if (t.dataset.view) { e.preventDefault(); setView(t.dataset.view); return; }
-    if (t.dataset.open) { openDetail(t.dataset.open); return; }
-    if (t.dataset.add != null) { openEditor(null, t.dataset.add || null); return; }
+    if (editorClick(t)) return;
+    if (t.hasAttribute('data-undo')) { t.closest('.toast').remove(); undo(); return; }
+    // 전체 일정에서는 포스트잇을 누르면 바로 고칠 수 있게 연다
+    if (t.dataset.open) { if (state.view === 'schedule') openEditor(t.dataset.open); else openDetail(t.dataset.open); return; }
+    if (t.dataset.add != null) { openEditor(null, t.dataset.add || null, t.dataset.at); return; }
     if (t.dataset.edit) { openEditor(t.dataset.edit); return; }
     if (t.id === 'ed-delete') { deleteItem(t); return; }
     if (t.hasAttribute('data-close')) { $('#detail').close(); return; }
@@ -1089,6 +1140,7 @@
   });
   document.addEventListener('change', e => {
     const t = e.target;
+    if (t.id === 'ed-date') { const f = t.form; $$('[data-ed-date]', f).forEach(b => b.classList.toggle('on', b.dataset.edDate === t.value)); $('.ed-date-other', f).classList.toggle('on', !$$('[data-ed-date]', f).some(b => b.dataset.edDate === t.value)); }
     if (t.dataset.check) { const x = state.checks.find(c => c.id === t.dataset.check); if (x) { x.done = t.checked; save(); renderWidgets(); } }
     if (t.dataset.map) { state.pending.map[t.dataset.map] = t.value === '' ? null : +t.value; renderUpload(); }
     if (t.id === 'sheet-select') { const ex = state.pending.extras; state.pending = pendingFromBook(state.pending.book, state.pending.fileName, t.value); state.pending.extras = ex; renderUpload(); }

@@ -516,3 +516,30 @@ details.more[open] summary { margin-bottom: 10px; }
   .j-srow .j-stage { padding: 10px 12px 6px; align-items: center; }
   .j-snotes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 4px 12px 12px; }
 }
+
+/* 일정 편집: 눌러서 고르는 날짜 · 시간 · 구분 */
+.editor .sheet-body { gap: 14px; }
+.ed-chips { gap: 6px; }
+.ed-chips .pill { min-height: 38px; padding: 4px 12px; font-size: 15px; font-weight: 600; border: 1.5px solid var(--ink); color: var(--text-secondary); background: var(--bg-surface); }
+.ed-chips .pill small { font-weight: 400; font-size: 12px; opacity: .8; }
+.ed-chips .pill.on { background: var(--brand); color: #fff; border-color: transparent; }
+.ed-chips .pill[data-cat].on { background: var(--c-etc, #F0F0F3); color: #1E1E1E; box-shadow: inset 0 0 0 2px #1E1E1E; }
+.ed-chips .pill[data-cat="move"].on { background: var(--c-move, #C2E5FF); } .ed-chips .pill[data-cat="food"].on { background: var(--c-food, #FFD9B3); }
+.ed-chips .pill[data-cat="sight"].on { background: var(--c-sight, #CDF4D3); } .ed-chips .pill[data-cat="rest"].on { background: var(--c-rest, #DCCCFF); }
+.ed-chips .pill[data-cat="onsen"].on { background: var(--c-onsen, #FFC7DE); } .ed-chips .pill[data-cat="prep"].on { background: var(--c-prep, #E6E6EC); }
+.ed-chips .pill[data-cat="free"].on { background: var(--c-free, #FFF1A8); }
+.ed-date-other { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.ed-date-other input { min-height: 0 !important; height: 30px; padding: 0 6px !important; width: auto !important; border: 0 !important; background: transparent !important; font-size: 14px; color: inherit; }
+.ed-date-other:not(.on) input { width: 0 !important; padding: 0 !important; opacity: 0; position: absolute; inset: 0; }
+.ed-nudge { display: flex; flex-wrap: wrap; gap: 4px; }
+.ed-nudge button { min-height: 32px; padding: 0 9px; border-radius: 999px; background: var(--bg-subtle); font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.ed-cat-input { min-height: 40px !important; margin-top: 2px; font-size: 14px; }
+.ed-more { font-weight: 400; } .ed-more > .field { margin-top: 10px; }
+.editor .sheet-cta { flex-wrap: wrap; }
+.editor .sheet-cta .btn { flex: 1 1 120px; }
+/* 계획표의 '+' 추가 버튼과 방금 고친 일정 반짝임 */
+.j-add { display: grid; place-items: center; min-height: 34px; border: 1.5px dashed #C9C9D2; border-radius: 8px; color: #8A8A96; background: transparent; }
+.j-add:hover { border-color: var(--brand); color: var(--brand); background: rgba(123,97,255,.06); }
+.j-add svg { width: 16px; height: 16px; }
+.j-note[data-flash] { animation: flash 1.6s ease 2; }
+@keyframes flash { 0%, 100% { box-shadow: 0 0 0 0 rgba(123,97,255,0); } 40% { box-shadow: 0 0 0 5px rgba(123,97,255,.55); } }
