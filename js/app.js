@@ -523,7 +523,7 @@
       list.forEach(x => { x.of = Math.max(...list.filter(y => y.s[0] < x.s[1] && x.s[0] < y.s[1]).map(y => y.lane)) + 1; });
       const blocks = list.map(({ it, s, lane, of }) => {
         const tr = transportFor(it), lv = tr && tr.level !== 'ok' ? tr.level : '', st = statusOf(it, now), dur = s[1] - s[0];
-        return `<button class="tt-block${dur < 25 ? ' short' : ''}" data-cat="${catKey(it.category)}" data-open="${esc(it.id)}"${lv ? ` data-level="${lv}"` : ''}${st === 'done' ? ' data-done' : ''}${state.flash === it.id ? ' data-flash' : ''}
+        return `<button class="tt-block${dur < 25 ? ' short' : ''}${clashOf(it, it.id) ? ' clash' : ''}" data-cat="${catKey(it.category)}" data-open="${esc(it.id)}"${lv ? ` data-level="${lv}"` : ''}${st === 'done' ? ' data-done' : ''}${state.flash === it.id ? ' data-flash' : ''}
           style="--t:${top(s[0])};--h:${dur};--lane:${lane};--of:${of}" title="${it.time}${it.end ? '~' + it.end : ''} ${esc(it.title)}">
           <small>${it.time}${it.end ? `<i>~${it.end}</i>` : ''}${lv ? `<em>${lv === 'late' ? '지연' : '빠듯'}</em>` : ''}</small><span>${esc(it.title)}</span><i class="tt-resize" aria-hidden="true"></i></button>`;
       }).join('');
@@ -532,7 +532,8 @@
     };
     const hours = Array.from({ length: endH - startH }, (_, i) => `<span style="--t:${i * 60}">${(startH + i) % 24}:00</span>`).join('');
     const segs = liveSegs(), cnt = k => segs.filter(s => s.level === k).length;
-    return `${segs.length ? `<p class="tt-sum"><span class="chip soon">지연 ${cnt('late')}</span><span class="chip warn">빠듯 ${cnt('tight')}</span><span class="muted small">표시된 칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</span></p>` : '<p class="tt-sum muted small">칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</p>'}
+    const ov = overlaps().filter(x => ds.includes(x.date));
+    return `${ov.length ? `<p class="tt-overlap">${icon('clock')}<span>겹친 일정이 <b>${ov.length}개</b> 있어요. 일정은 겹칠 수 없어요.</span><button class="btn btn-sm btn-primary" data-fix-overlaps>자동 정리</button></p>` : ''}${segs.length ? `<p class="tt-sum"><span class="chip soon">지연 ${cnt('late')}</span><span class="chip warn">빠듯 ${cnt('tight')}</span><span class="muted small">표시된 칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</span></p>` : '<p class="tt-sum muted small">칸을 누르면 고칠 수 있어요 · 빈 곳을 누르면 그 시간에 일정 추가</p>'}
       <div class="timetable" style="--days:${ds.length};--startH:${startH}">
         <div class="tt-head"><span class="tt-corner">시간</span>${ds.map((d, i) => `<button class="tt-day${d === t ? ' today' : ''}" data-sday="${d}" data-smode-to="board">${i + 1}일차 <small>${fmtShort(d)}</small></button>`).join('')}</div>
         <div class="tt-body"><div class="tt-hours" style="--total:${total}">${hours}</div>${ds.map(col).join('')}</div>
@@ -571,7 +572,10 @@
     e.preventDefault();
     const step = Math.round(dy / d.ppm / 10) * 10;
     if (d.mode === 'resize') {
+      // 다음 일정 시작을 넘어 늘릴 수 없다
+      const next = state.items.filter(o => o.id !== d.it.id && o.date === d.date && toMin(o.time) >= d.a + 1).map(o => toMin(o.time)).sort((x, y) => x - y)[0];
       d.nb = Math.max(d.a + 10, d.a + d.dur + step);
+      if (next != null) d.nb = Math.min(d.nb, Math.max(next, d.a + 10));
       d.block.style.setProperty('--h', d.nb - d.a);
       ttLabel(d, d.a, d.nb);
       return;
@@ -585,6 +589,8 @@
     if (col && col !== d.block.parentNode) { col.appendChild(d.block); d.date = col.dataset.ttDate; }
     d.block.style.setProperty('--t', d.na - d.base);
     ttLabel(d, d.na, d.nb);
+    d.clash = clashOf({ date: d.date, time: addMin('00:00', d.na), end: addMin('00:00', d.nb) }, d.it.id);
+    d.block.classList.toggle('clash', !!d.clash);
   }, { passive: false });
   // 손가락으로 끄는 동안에는 화면이 같이 스크롤되지 않게
   document.addEventListener('touchmove', e => { if (ttDrag.on) e.preventDefault(); }, { passive: false });
@@ -596,6 +602,8 @@
     ttDrag.suppress = true; setTimeout(() => { ttDrag.suppress = false; }, 50);
     const it = d.it, moved = d.mode === 'move' ? d.na !== d.a || d.date !== it.date : d.nb !== d.a + d.dur;
     if (!moved) { renderSchedule(); return; }
+    if (d.mode === 'resize') d.clash = clashOf({ date: d.date, time: d.it.time, end: addMin('00:00', d.nb) }, d.it.id);
+    if (d.clash) { renderSchedule(); toast('일정이 겹쳐서 옮기지 않았어요', `'${d.clash.title}' ${d.clash.time}${d.clash.end ? '~' + d.clash.end : ''}`); return; }
     remember();
     if (d.mode === 'move') {
       it.date = d.date; it.time = addMin('00:00', d.na);
@@ -901,6 +909,35 @@
     const last = list[list.length - 1];
     return last ? (last.end || addMin(last.time, 60)) : '09:00';
   };
+  // 일정은 서로 겹칠 수 없다: 시작~끝(끝이 없으면 시작 시각 한 점)이 다른 일정과 맞물리면 그 일정을 돌려준다
+  const spanOf = x => { const a = toMin(x.time); let b = x.end ? toMin(x.end) : x.duration ? a + x.duration : a; if (b < a) b += 1440; return [a, b]; };
+  const clashOf = (x, exceptId) => {
+    const [a, b] = spanOf(x);
+    return state.items.find(o => o.id !== exceptId && o.date === x.date && (() => { const [c, d] = spanOf(o); return (a < d && c < b) || a === c; })()) || null;
+  };
+  // 이미 겹쳐 있는 일정 찾기 · 정리: 앞 일정의 끝을 다음 일정 시작에 맞추고, 시작이 같으면 뒤 일정을 앞 일정이 끝난 뒤로 민다
+  const overlaps = () => state.items.filter(x => clashOf(x, x.id));
+  const fixOverlaps = () => {
+    remember();
+    let n = 0;
+    for (const d of days()) {
+      for (let guard = 0; guard < 200; guard++) {
+        const list = state.items.filter(i => i.date === d).sort((x, y) => toMin(x.time) - toMin(y.time));
+        let changed = false;
+        for (let k = 1; k < list.length; k++) {
+          const p = list[k - 1], q = list[k], [pa, pb] = spanOf(p), [qa] = spanOf(q);
+          if (pb <= qa && pa !== qa) continue;
+          if (pa < qa) { p.end = q.time; p.duration = qa - pa; }
+          else { const qd = spanOf(q)[1] - qa; q.time = addMin('00:00', pb > pa ? pb : pa + 10); if (q.end || q.duration) { q.end = addMin(q.time, qd); q.duration = qd; } }
+          n++; changed = true; break;
+        }
+        if (!changed) break;
+      }
+    }
+    state.items.sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
+    save(); render();
+    toast(`겹친 일정 ${n}곳을 정리했어요`, '앞 일정의 끝을 다음 일정 시작에 맞췄어요', null, true);
+  };
   let undoBuf = null;
   const remember = () => { undoBuf = JSON.stringify(state.items); };
   const openEditor = (id, date, at) => {
@@ -984,6 +1021,10 @@
     const r = f('remind');
     const data = { date: f('date'), time: f('time'), end, duration, title: f('title'), place: f('place'), category: f('category'), memo: form.elements.memo.value.trim(), mapUrl: map, remind: r === 'default' ? undefined : r === 'off' ? null : +r };
     const editingId = mode === 'copy' ? null : form.dataset.id || null;
+    // 복제본은 그날 마지막 일정이 끝난 뒤로 놓는다 (원래 일정과 겹치지 않게)
+    if (mode === 'copy') { data.time = nextFreeTime(data.date); if (data.duration) data.end = addMin(data.time, data.duration); }
+    const clash = clashOf(data, editingId);
+    if (clash) return err(`'${clash.title}' (${clash.time}${clash.end ? '~' + clash.end : ''})과(와) 시간이 겹쳐요. 시간을 바꿔 주세요.`);
     remember();
     let it = editingId ? state.items.find(i => i.id === editingId) : null;
     if (it) Object.assign(it, data);
@@ -1291,6 +1332,7 @@
     const t = e.target.closest('button, a');
     if (!t) return;
     if (t.dataset.view) { e.preventDefault(); setView(t.dataset.view); return; }
+    if (t.hasAttribute('data-fix-overlaps')) { fixOverlaps(); return; }
     if (editorClick(t)) return;
     if (t.hasAttribute('data-undo')) { t.closest('.toast').remove(); undo(); return; }
     // 전체 일정에서는 포스트잇을 누르면 바로 고칠 수 있게 연다
