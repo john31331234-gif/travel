@@ -79,7 +79,7 @@ function buildView(trip, now) {
     now: current && current !== focus ? { title: current.title, endTime: hhmm(current.end) } : null,
     upcoming: upcoming.map(i => ({ ...i, flag: flagOf(i), isToday: i.date === today, dateLabel: shortDate(i.date) })),
     budget, progress,
-    refreshAt: Math.min(...[now + 30 * 60000, focus ? focus.start : Infinity, focus ? focus.end : Infinity].filter(t => t > now)),
+    refreshAt: Math.min(...[now + (focus && focus.start - now < 3 * 3600000 ? 10 : 30) * 60000, focus ? focus.start : Infinity, focus ? focus.end : Infinity].filter(t => t > now)),
   };
 }
 
@@ -167,10 +167,22 @@ function addRelative(stack, ms, size, color) {
 }
 function pill(stack, bg) { const c = stack.addStack(); c.backgroundColor = bg; c.cornerRadius = 9; c.setPadding(3, 8, 3, 8); c.centerAlignContent(); return c; }
 // 남은 시간(또는 끝나는 시각)을 포인트 색 알약으로
+// 남은 시간 글자. 날짜(addDate)는 칸을 옆으로 꽉 채워 버려서, 1시간 안일 때만 크기를 고정해 실시간으로 쓴다
 function countdown(stack, f, th, size) {
   const p = pill(stack, th.accentSoft);
-  if (f.isNow) addText(p, `${f.endTime}까지`, size, th.accent, 'semibold'); else addRelative(p, f.start, size, th.accent);
+  if (f.isNow) { addText(p, `${f.endTime}까지`, size, th.accent, 'semibold'); return; }
+  const m = Math.max(0, Math.round((f.start - Date.now()) / 60000));
+  if (m < 60) { p.size = new Size(size * 6, size + 10); const d = addRelative(p, f.start, size, th.accent); d.centerAlignText(); return; }
+  const h = Math.floor(m / 60), r = m % 60;
+  addText(p, m < 1440 ? `${h}시간${r ? ` ${r}분` : ''} 후` : `${Math.round(m / 1440)}일 후`, size, th.accent, 'semibold');
 }
+// 위젯 실제 크기(pt): 아이폰 화면 너비별 [너비, 중간 높이, 크게 높이]
+function widgetSize() {
+  const sw = typeof Device !== 'undefined' ? Math.round(Math.min(Device.screenSize().width, Device.screenSize().height)) : 0;
+  return sw >= 428 ? [364, 170, 382] : sw >= 414 ? [360, 169, 379] : sw >= 390 ? [338, 158, 354] : [329, 155, 345];
+}
+// 날짜 줄이 끼면 한 줄 덜 보여 준다(칸이 넘치지 않게)
+const fitRows = (items, n) => { const it = items.slice(0, n); return it.some(i => !i.isToday) ? items.slice(0, n - 1) : it; };
 function flagTag(stack, flag, th, size) {
   if (!flag) return;
   stack.addSpacer(6);
@@ -190,9 +202,9 @@ function header(parent, v, th, text, right) {
 }
 // 오늘 진행 막대: 끝난 일정 / 전체
 function progressBar(parent, v, th, width) {
-  const g = v.progress; if (!g) return;
+  const g = v.progress; if (!g || !g.isToday) return; // 여행 중에만
   const row = parent.addStack(); row.centerAlignContent();
-  addText(row, g.isToday ? '오늘' : '그날', 10, th.sub, 'semibold'); row.addSpacer();
+  addText(row, '오늘', 10, th.sub, 'semibold'); row.addSpacer();
   addText(row, `${g.done}/${g.total}`, 10, th.sub, 'bold');
   parent.addSpacer(4);
   const track = parent.addStack(); track.size = new Size(width, 4); track.cornerRadius = 2; track.backgroundColor = th.track;
@@ -218,8 +230,8 @@ function timeline(parent, items, th, size) {
     lastDate = i.date;
     const r = parent.addStack(); r.centerAlignContent();
     dot(r, idx === 0 ? th.accent : th.track, 6); r.addSpacer(7);
-    const tm = r.addStack(); tm.size = new Size(size * 3.1, 0);
-    addText(tm, i.time, size, idx === 0 ? th.accent : th.sub, 'bold');
+    const tm = addText(r, i.time, size, idx === 0 ? th.accent : th.sub, 'bold'); tm.font = Font.boldMonospacedSystemFont(size);
+    r.addSpacer(7);
     addText(r, i.title, size, th.text, 'medium');
     flagTag(r, i.flag, th, size - 3);
     r.addSpacer();
@@ -254,7 +266,7 @@ function makeWidget(v, family, th, stale) {
     header(w, v, th, v.label);
     w.addSpacer();
     if (!v.focus) { emptyText(w, v, th); w.addSpacer(); return w; }
-    focusBlock(w, v, th, 34, 13, 2);
+    focusBlock(w, v, th, 34, 13, 1);
     w.addSpacer(7);
     const c = w.addStack(); countdown(c, v.focus, th, 11); c.addSpacer();
     if (stale) addText(c, '오프라인', 9, th.sub, 'regular');
@@ -263,21 +275,23 @@ function makeWidget(v, family, th, stale) {
 
   if (!v.focus) { header(w, v, th, `핑트립 · ${v.label}`); w.addSpacer(10); emptyText(w, v, th); w.addSpacer(); return w; }
 
+  const [W, MH, LH] = widgetSize();
   if (family === 'medium') {
+    const H = MH - 30;
     const row = w.addStack(); row.topAlignContent();
-    const left = row.addStack(); left.layoutVertically(); left.size = new Size(138, 140);
+    const left = row.addStack(); left.layoutVertically(); left.size = new Size(138, H);
     header(left, v, th, v.label);
     left.addSpacer();
-    focusBlock(left, v, th, 32, 13, 2);
+    focusBlock(left, v, th, 30, 13, 1);
     left.addSpacer(6);
     const c = left.addStack(); countdown(c, v.focus, th, 11); c.addSpacer();
     row.addSpacer(14);
-    const right = row.addStack(); right.layoutVertically(); right.size = new Size(0, 140);
+    const right = row.addStack(); right.layoutVertically(); right.size = new Size(W - 30 - 138 - 14, H);
     addText(right, stale ? '이어서 · 오프라인' : '이어서', 11, th.sub, 'semibold');
-    right.addSpacer(8);
-    timeline(right, v.upcoming.slice(0, 4), th, 12);
+    right.addSpacer(7);
+    timeline(right, fitRows(v.upcoming, v.progress && v.progress.isToday ? 4 : 5), th, 12);
     right.addSpacer();
-    progressBar(right, v, th, 176);
+    progressBar(right, v, th, W - 30 - 138 - 14);
     return w;
   }
 
@@ -291,11 +305,11 @@ function makeWidget(v, family, th, stale) {
   countdown(top, v.focus, th, 12);
   if (v.now) { w.addSpacer(4); addText(w, `지금 · ${v.now.title} ~${v.now.endTime}`, 11, th.sub, 'regular'); }
   w.addSpacer(10);
-  progressBar(w, v, th, 334);
+  progressBar(w, v, th, W - 30);
   w.addSpacer(14);
   addText(w, '이어서', 11, th.sub, 'semibold');
   w.addSpacer(8);
-  timeline(w, v.upcoming.slice(0, 6), th, 13);
+  timeline(w, fitRows(v.upcoming, v.progress && v.progress.isToday ? 4 : 6), th, 13);
   w.addSpacer();
   if (v.budget) {
     const br = w.addStack(); br.centerAlignContent(); br.backgroundColor = th.accentSoft; br.cornerRadius = 12; br.setPadding(8, 12, 8, 12);
