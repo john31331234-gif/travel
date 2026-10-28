@@ -3,7 +3,7 @@
 //
 // 설치: Scriptable 앱 → + → 이 파일 내용을 모두 붙여 넣기 → 이름 "핑트립" → ▶ 실행 → 사이트와 같은 이메일 · 비밀번호 입력
 // 위젯: 홈 화면 길게 누르기 → + → Scriptable → 크기 선택 → 위젯 편집 → Script: 핑트립
-//       Parameter 칸: 비우면 핑트립(보라 → 코랄), "clean"은 흰 바탕, "ticket"은 보딩패스(노랑 · 검정) 테마.
+//       Parameter 칸: 비우면 핑트립(흰 · 검정 바탕 + 보라 포인트), "clean"은 파랑 포인트, "ticket"은 검정 바탕 + 노랑 포인트.
 
 const SITE_URL = 'https://john31331234-gif.github.io/travel/';
 const API_KEY = 'AIzaSyAqW77wiHgampjaegS3LtBb1FUegdHZvxo';
@@ -56,6 +56,10 @@ function buildView(trip, now) {
   const focus = next && (!current || next.start - now < 30 * 60000) ? next : current;
   // 크게 보여 주는 일정과 진행 중인 일정은 목록에서 뺀다(진행 중인 일정은 카드 안에 따로 표시)
   const upcoming = items.filter(i => i.start > now && i !== focus).slice(0, 8);
+  // 오늘(여행 전이면 다음 일정 날) 일정 중 끝난 것 / 전체
+  const pDay = dayIdx >= 0 ? today : focus ? focus.date : null;
+  const dayItems = items.filter(i => i.date === pDay);
+  const progress = dayItems.length ? { done: dayItems.filter(i => i.end <= now).length, total: dayItems.length, isToday: pDay === today } : null;
   const hhmm = ms => { const p = partsIn(ms, tz); return `${pad(p.h)}:${pad(p.mi)}`; };
   const b = trip.extras && trip.extras.budget;
   let budget = null;
@@ -74,7 +78,7 @@ function buildView(trip, now) {
     focus: focus && { ...focus, isNow: focus === current, flag: flagOf(focus), dateLabel: focus.date === today ? '' : shortDate(focus.date), endTime: hhmm(focus.end) },
     now: current && current !== focus ? { title: current.title, endTime: hhmm(current.end) } : null,
     upcoming: upcoming.map(i => ({ ...i, flag: flagOf(i), isToday: i.date === today, dateLabel: shortDate(i.date) })),
-    budget,
+    budget, progress,
     refreshAt: Math.min(...[now + 30 * 60000, focus ? focus.start : Infinity, focus ? focus.end : Infinity].filter(t => t > now)),
   };
 }
@@ -139,22 +143,20 @@ async function loadTrip() {
 }
 
 // ---------- 그리기 ----------
-// 기본은 핑트립 테마: 보라 계열 한 가지 색으로 맞춘 카드 · 시간 · 예산. Parameter로 clean · ticket도 고를 수 있다.
-const grad = (colors, from, to) => { const g = new LinearGradient(); g.colors = colors.map(c => new Color(c)); g.locations = colors.map((_, i) => i / (colors.length - 1)); g.startPoint = new Point(from[0], from[1]); g.endPoint = new Point(to[0], to[1]); return g; };
+// 무채색 바탕 + 포인트 색 하나. 숫자는 둥근 시스템 글꼴. Parameter로 clean · ticket도 고를 수 있다.
+const C = (l, d) => d ? Color.dynamic(new Color(l), new Color(d)) : new Color(l);
 const THEMES = {
-  ping: { bg: Color.dynamic(new Color('#FFFFFF'), new Color('#16141F')), hero: () => grad(['#6A5CFF', '#9257FF'], [0, 0], [1, 1]), heroText: Color.white(), heroSub: new Color('#FFFFFF', 0.75), pill: new Color('#FFFFFF', 0.2),
-    text: Color.dynamic(new Color('#1B1830'), new Color('#F4F2FA')), sub: Color.dynamic(new Color('#77728C'), new Color('#A39DB8')), accent: Color.dynamic(new Color('#6A5CFF'), new Color('#A99BFF')),
-    warn: Color.dynamic(new Color('#D9480F'), new Color('#FF8A65')), tight: Color.dynamic(new Color('#B26B00'), new Color('#FFC266')),
-    warnBg: Color.dynamic(new Color('#FFEDE6'), new Color('#3A221C')), tightBg: Color.dynamic(new Color('#FFF4DC'), new Color('#3A3018')),
-    line: Color.dynamic(new Color('#F3F0FF'), new Color('#252036')), lineText: Color.dynamic(new Color('#6A5CFF'), new Color('#C9C0FF')) },
-  clean: { bg: Color.dynamic(new Color('#FFFFFF'), new Color('#1C1C1E')), hero: null, heroText: Color.dynamic(new Color('#191F28'), new Color('#F2F2F7')), heroSub: Color.dynamic(new Color('#6B7684'), new Color('#9E9EA6')), pill: Color.dynamic(new Color('#F2F4F6'), new Color('#2C2C2E')),
-    text: Color.dynamic(new Color('#191F28'), new Color('#F2F2F7')), sub: Color.dynamic(new Color('#6B7684'), new Color('#9E9EA6')), accent: new Color('#3182F6'), warn: new Color('#F04452'), tight: new Color('#E8A100'), line: Color.dynamic(new Color('#F2F4F6'), new Color('#2C2C2E')) },
-  ticket: { bg: new Color('#0F1217'), hero: () => grad(['#FFB020', '#FFB020'], [0, 0], [1, 1]), heroText: new Color('#14161B'), heroSub: new Color('#14161B', 0.7), pill: new Color('#14161B', 0.12),
-    text: new Color('#ECEEF2'), sub: new Color('#8C94A6'), accent: new Color('#FFB020'), warn: new Color('#FF6B5A'), tight: new Color('#FFB020'), line: new Color('#222733') },
+  ping: { bg: C('#FFFFFF', '#15141C'), text: C('#16151D', '#F3F2F8'), sub: C('#8A8798', '#8F8BA3'), accent: C('#5B4FE0', '#A79BFF'),
+    accentSoft: C('#EFEDFF', '#262340'), warn: C('#E8590C', '#FF8F66'), warnSoft: C('#FFF0E8', '#3A2620'), track: C('#EEEDF3', '#2A2834') },
+  clean: { bg: C('#FFFFFF', '#1C1C1E'), text: C('#191F28', '#F2F2F7'), sub: C('#8B95A1', '#8E8E93'), accent: C('#3182F6', '#4C9AFF'),
+    accentSoft: C('#EAF2FE', '#1F2A3A'), warn: C('#F04452', '#FF6B76'), warnSoft: C('#FEECEE', '#3A2024'), track: C('#F2F4F6', '#2C2C2E') },
+  ticket: { bg: C('#101216'), text: C('#ECEEF2'), sub: C('#7F8798'), accent: C('#FFB020'),
+    accentSoft: C('#2A2516'), warn: C('#FF6B5A'), warnSoft: C('#33201E'), track: C('#22262F') },
 };
+const FONTS = { heavy: 'heavyRoundedSystemFont', bold: 'boldRoundedSystemFont', semibold: 'semiboldSystemFont', medium: 'mediumSystemFont', regular: 'systemFont' };
 function addText(stack, str, size, color, weight, lines) {
   const t = stack.addText(String(str));
-  t.font = weight === 'heavy' ? Font.heavySystemFont(size) : weight === 'bold' ? Font.boldSystemFont(size) : weight === 'semibold' ? Font.semiboldSystemFont(size) : Font.systemFont(size);
+  t.font = Font[FONTS[weight] || FONTS.regular](size);
   t.textColor = color; t.lineLimit = lines || 1; t.minimumScaleFactor = 0.7;
   return t;
 }
@@ -163,72 +165,74 @@ function addRelative(stack, ms, size, color) {
   d.applyRelativeStyle(); d.font = Font.semiboldSystemFont(size); d.textColor = color; d.lineLimit = 1; d.minimumScaleFactor = 0.7;
   return d;
 }
-function chip(stack, str, bg, color, size) {
-  const c = stack.addStack(); c.backgroundColor = bg; c.cornerRadius = 7; c.setPadding(2, 6, 2, 6); c.centerAlignContent();
-  addText(c, str, size, color, 'bold');
-  return c;
+function pill(stack, bg) { const c = stack.addStack(); c.backgroundColor = bg; c.cornerRadius = 9; c.setPadding(3, 8, 3, 8); c.centerAlignContent(); return c; }
+// 남은 시간(또는 끝나는 시각)을 포인트 색 알약으로
+function countdown(stack, f, th, size) {
+  const p = pill(stack, th.accentSoft);
+  if (f.isNow) addText(p, `${f.endTime}까지`, size, th.accent, 'semibold'); else addRelative(p, f.start, size, th.accent);
 }
-function flagChip(stack, flag, th, size, onHero) {
+function flagTag(stack, flag, th, size) {
   if (!flag) return;
-  stack.addSpacer(5);
-  const late = flag === '지연';
-  if (onHero) chip(stack, flag, th.pill, th.heroText, size);
-  else if (th.warnBg) chip(stack, flag, late ? th.warnBg : th.tightBg, late ? th.warn : th.tight, size);
-  else chip(stack, flag, late ? th.warn : th.tight, Color.white(), size);
+  stack.addSpacer(6);
+  const p = pill(stack, th.warnSoft); p.setPadding(1, 6, 1, 6); p.cornerRadius = 6;
+  addText(p, flag, size, th.warn, 'semibold');
 }
+function dot(stack, color, d) { const s = stack.addStack(); s.size = new Size(d, d); s.cornerRadius = d / 2; s.backgroundColor = color; }
 function logo(stack, color, size) {
   const ic = stack.addImage(SFSymbol.named('mappin.and.ellipse').image); ic.imageSize = new Size(size, size); ic.tintColor = color;
 }
-
-// 다음(또는 진행 중) 일정 카드: 그라데이션 위에 큰 시간 · 이름 · 남은 시간
-function heroCard(parent, v, th, family, fill) {
-  const f = v.focus, big = family === 'small' ? 30 : family === 'large' ? 38 : 32;
-  const box = parent.addStack(); box.layoutVertically();
-  if (th.hero && !fill) { box.backgroundGradient = th.hero(); box.cornerRadius = 18; box.setPadding(12, 12, 12, 12); }
-  const top = box.addStack(); top.centerAlignContent();
-  addText(top, f.isNow ? '지금 진행 중' : f.dateLabel ? `다음 · ${f.dateLabel}` : '다음 일정', 11, th.heroSub, 'semibold');
-  flagChip(top, f.flag, th, 10, !!th.hero || fill);
-  top.addSpacer(); // 카드가 옆으로 꽉 차게
-  box.addSpacer(2);
-  addText(box, f.time, big, th.heroText, 'heavy');
-  addText(box, f.title, family === 'small' ? 14 : 15, th.heroText, 'bold', 2);
-  box.addSpacer(6);
-  const p = box.addStack(); p.backgroundColor = th.pill; p.cornerRadius = 8; p.setPadding(3, 8, 3, 8); p.centerAlignContent();
-  if (f.isNow) addText(p, `${f.endTime}까지`, 11, th.heroText, 'semibold');
-  else addRelative(p, f.start, 11, th.heroText);
-  if (v.now && family === 'large') { box.addSpacer(6); addText(box, `지금 · ${v.now.title} ~${v.now.endTime}`, 11, th.heroSub, 'regular'); }
-  return box;
+function header(parent, v, th, text, right) {
+  const h = parent.addStack(); h.centerAlignContent();
+  logo(h, th.accent, 12); h.addSpacer(4);
+  addText(h, text, 11, th.sub, 'semibold');
+  h.addSpacer();
+  if (right) addText(h, right, 11, th.sub, 'regular');
 }
-
-// 이어지는 일정: 시간 · 이름 · 지연/빠듯 (색은 테마 색 하나로 맞춘다)
-function listRows(parent, items, th, size) {
+// 오늘 진행 막대: 끝난 일정 / 전체
+function progressBar(parent, v, th, width) {
+  const g = v.progress; if (!g) return;
+  const row = parent.addStack(); row.centerAlignContent();
+  addText(row, g.isToday ? '오늘' : '그날', 10, th.sub, 'semibold'); row.addSpacer();
+  addText(row, `${g.done}/${g.total}`, 10, th.sub, 'bold');
+  parent.addSpacer(4);
+  const track = parent.addStack(); track.size = new Size(width, 4); track.cornerRadius = 2; track.backgroundColor = th.track;
+  const w = Math.round(width * g.done / g.total);
+  if (w > 0) { const fill = track.addStack(); fill.size = new Size(w, 4); fill.cornerRadius = 2; fill.backgroundColor = th.accent; }
+  track.addSpacer();
+}
+// 다음(또는 진행 중) 일정: 작은 라벨 · 큰 시각 · 이름
+function focusBlock(parent, v, th, big, titleSize, lines) {
+  const f = v.focus;
+  addText(parent, f.isNow ? '지금 진행 중' : f.dateLabel ? `다음 · ${f.dateLabel}` : '다음 일정', 11, th.sub, 'semibold');
+  parent.addSpacer(1);
+  const t = parent.addStack(); t.centerAlignContent();
+  addText(t, f.time, big, th.text, 'heavy');
+  flagTag(t, f.flag, th, 10);
+  addText(parent, f.title, titleSize, th.text, 'semibold', lines);
+}
+// 이어지는 일정: 점 · 시각 · 이름 (첫 줄만 포인트 색)
+function timeline(parent, items, th, size) {
   let lastDate = null;
   items.forEach((i, idx) => {
     if (!i.isToday && i.date !== lastDate) { addText(parent, i.dateLabel, size - 2, th.sub, 'semibold'); parent.addSpacer(3); }
     lastDate = i.date;
     const r = parent.addStack(); r.centerAlignContent();
-    addText(r, i.time, size, th.accent, 'bold'); r.addSpacer(8);
-    addText(r, i.title, size, th.text, 'regular');
-    flagChip(r, i.flag, th, size - 3);
+    dot(r, idx === 0 ? th.accent : th.track, 6); r.addSpacer(7);
+    const tm = r.addStack(); tm.size = new Size(size * 3.1, 0);
+    addText(tm, i.time, size, idx === 0 ? th.accent : th.sub, 'bold');
+    addText(r, i.title, size, th.text, 'medium');
+    flagTag(r, i.flag, th, size - 3);
     r.addSpacer();
-    if (idx < items.length - 1) parent.addSpacer(5);
+    if (idx < items.length - 1) parent.addSpacer(6);
   });
 }
-
-function header(w, v, th, family, onHero) {
-  const head = w.addStack(); head.centerAlignContent();
-  logo(head, onHero ? th.heroText : th.accent, 12); head.addSpacer(4);
-  addText(head, family === 'small' ? v.label : `핑트립 · ${v.label}`, 11, onHero ? th.heroSub : th.sub, 'semibold');
-  head.addSpacer();
-  if (family === 'large') addText(head, v.tripName, 11, th.sub, 'regular');
-}
+function emptyText(w, v, th) { addText(w, v.label === '일정 없음' ? '사이트에서 일정을 올려 주세요' : '남은 일정이 없어요', 15, th.text, 'semibold', 3); }
 
 function makeWidget(v, family, th, stale) {
   const w = new ListWidget();
   w.url = SITE_URL;
   w.refreshAfterDate = new Date(v.refreshAt);
   const inline = family === 'accessoryInline', rect = family === 'accessoryRectangular', circ = family === 'accessoryCircular';
-  if (!inline && !rect && !circ) w.backgroundColor = th.bg;
 
   if (inline || rect || circ) {
     // 잠금 화면 위젯은 시스템 색을 따른다
@@ -243,65 +247,71 @@ function makeWidget(v, family, th, stale) {
     return w;
   }
 
-  // 작게: 위젯 전체가 그라데이션 카드
+  w.backgroundColor = th.bg;
+  w.setPadding(15, 15, 15, 15);
+
   if (family === 'small') {
-    if (th.hero) w.backgroundGradient = th.hero();
-    w.setPadding(14, 14, 14, 14);
-    header(w, v, th, family, !!th.hero);
-    w.addSpacer(6);
-    if (!v.focus) { addText(w, v.label === '일정 없음' ? '사이트에서 일정을 올려 주세요' : '남은 일정이 없어요', 15, th.heroText, 'bold', 3); w.addSpacer(); return w; }
-    heroCard(w, v, th, family, true);
+    header(w, v, th, v.label);
     w.addSpacer();
-    if (stale) addText(w, '오프라인', 9, th.heroSub, 'regular');
+    if (!v.focus) { emptyText(w, v, th); w.addSpacer(); return w; }
+    focusBlock(w, v, th, 34, 13, 2);
+    w.addSpacer(7);
+    const c = w.addStack(); countdown(c, v.focus, th, 11); c.addSpacer();
+    if (stale) addText(c, '오프라인', 9, th.sub, 'regular');
     return w;
   }
 
-  w.setPadding(14, 14, 14, 14);
-  if (!v.focus) {
-    header(w, v, th, family, false); w.addSpacer(8);
-    addText(w, v.label === '일정 없음' ? '사이트에서 일정을 올려 주세요' : '남은 일정이 없어요', 15, th.text, 'bold', 2);
-    w.addSpacer(); return w;
-  }
+  if (!v.focus) { header(w, v, th, `핑트립 · ${v.label}`); w.addSpacer(10); emptyText(w, v, th); w.addSpacer(); return w; }
 
   if (family === 'medium') {
-    const row = w.addStack(); row.layoutHorizontally(); row.topAlignContent();
-    const left = row.addStack(); left.layoutVertically(); left.size = new Size(150, 0);
-    heroCard(left, v, th, family);
-    row.addSpacer(12);
-    const right = row.addStack(); right.layoutVertically();
-    right.addSpacer(2);
-    header(right, v, th, family, false);
+    const row = w.addStack(); row.topAlignContent();
+    const left = row.addStack(); left.layoutVertically(); left.size = new Size(138, 140);
+    header(left, v, th, v.label);
+    left.addSpacer();
+    focusBlock(left, v, th, 32, 13, 2);
+    left.addSpacer(6);
+    const c = left.addStack(); countdown(c, v.focus, th, 11); c.addSpacer();
+    row.addSpacer(14);
+    const right = row.addStack(); right.layoutVertically(); right.size = new Size(0, 140);
+    addText(right, stale ? '이어서 · 오프라인' : '이어서', 11, th.sub, 'semibold');
     right.addSpacer(8);
-    listRows(right, v.upcoming.slice(0, 4), th, 12);
+    timeline(right, v.upcoming.slice(0, 4), th, 12);
     right.addSpacer();
-    w.addSpacer();
-  } else {
-    header(w, v, th, family, false);
-    w.addSpacer(8);
-    heroCard(w, v, th, family);
-    w.addSpacer(12);
-    addText(w, '이어서', 11, th.sub, 'semibold');
-    w.addSpacer(6);
-    listRows(w, v.upcoming.slice(0, 6), th, 13);
-    w.addSpacer();
-    if (v.budget) {
-      const br = w.addStack(); br.centerAlignContent(); br.backgroundColor = th.line; br.cornerRadius = 10; br.setPadding(7, 10, 7, 10);
-      addText(br, '남은 예산', 11, th.lineText || th.sub, 'semibold'); br.addSpacer();
-      addText(br, '₩' + Math.round(v.budget.left).toLocaleString(), 13, th.lineText || th.text, 'bold');
-    }
+    progressBar(right, v, th, 176);
+    return w;
+  }
+
+  // 크게
+  header(w, v, th, `핑트립 · ${v.label}`, v.tripName);
+  w.addSpacer(12);
+  const top = w.addStack(); top.topAlignContent();
+  const fb = top.addStack(); fb.layoutVertically();
+  focusBlock(fb, v, th, 42, 16, 1);
+  top.addSpacer();
+  countdown(top, v.focus, th, 12);
+  if (v.now) { w.addSpacer(4); addText(w, `지금 · ${v.now.title} ~${v.now.endTime}`, 11, th.sub, 'regular'); }
+  w.addSpacer(10);
+  progressBar(w, v, th, 334);
+  w.addSpacer(14);
+  addText(w, '이어서', 11, th.sub, 'semibold');
+  w.addSpacer(8);
+  timeline(w, v.upcoming.slice(0, 6), th, 13);
+  w.addSpacer();
+  if (v.budget) {
+    const br = w.addStack(); br.centerAlignContent(); br.backgroundColor = th.accentSoft; br.cornerRadius = 12; br.setPadding(8, 12, 8, 12);
+    addText(br, '남은 예산', 11, th.accent, 'semibold'); br.addSpacer();
+    addText(br, '₩' + Math.round(v.budget.left).toLocaleString(), 14, th.accent, 'bold');
   }
   if (stale) { w.addSpacer(4); addText(w, '오프라인 · 마지막으로 받은 일정', 9, th.sub, 'regular'); }
   return w;
 }
 
 function messageWidget(title, body, th) {
-  const w = new ListWidget(); w.backgroundColor = th.bg; w.url = SITE_URL; w.setPadding(14, 14, 14, 14);
-  if (th.hero) w.backgroundGradient = th.hero();
-  const ink = th.hero ? th.heroText : th.text, sub = th.hero ? th.heroSub : th.sub;
-  const h = w.addStack(); h.centerAlignContent(); logo(h, ink, 12); h.addSpacer(4); addText(h, '핑트립', 11, sub, 'semibold');
-  w.addSpacer(6);
-  addText(w, title, 14, ink, 'bold', 2); w.addSpacer(2);
-  addText(w, body, 11, sub, 'regular', 4);
+  const w = new ListWidget(); w.backgroundColor = th.bg; w.url = SITE_URL; w.setPadding(15, 15, 15, 15);
+  const h = w.addStack(); h.centerAlignContent(); logo(h, th.accent, 12); h.addSpacer(4); addText(h, '핑트립', 11, th.sub, 'semibold');
+  w.addSpacer(8);
+  addText(w, title, 14, th.text, 'bold', 2); w.addSpacer(3);
+  addText(w, body, 11, th.sub, 'regular', 4);
   return w;
 }
 
