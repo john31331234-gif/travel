@@ -539,8 +539,10 @@
   const donut = (parts, total, size) => {
     const r = size / 2 - 6, c = 2 * Math.PI * r, gap = parts.length > 1 ? 2 : 0;
     let off = 0;
-    const segs = parts.map(p => { const len = p.v / total * c, seg = `<circle r="${r}" cx="${size / 2}" cy="${size / 2}" fill="none" stroke="${p.color}" stroke-width="10" stroke-dasharray="${Math.max(0, len - gap)} ${c}" stroke-dashoffset="${-off}"><title>${p.cat} ${won(p.v)} (${Math.round(p.v / total * 100)}%)</title></circle>`; off += len; return seg; }).join('');
-    return `<svg class="donut" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="구분별 경비"><g transform="rotate(-90 ${size / 2} ${size / 2})">${segs}</g></svg>`;
+    const segs = parts.map(p => { const len = p.v / total * c, seg = `<circle r="${r}" cx="${size / 2}" cy="${size / 2}" fill="none" stroke="${p.color}" style="stroke:var(--cc${p.i}, ${p.color})" stroke-width="10" stroke-dasharray="${Math.max(0, len - gap)} ${c}" stroke-dashoffset="${-off}"><title>${p.cat} ${won(p.v)} (${Math.round(p.v / total * 100)}%)</title></circle>`; off += len; return seg; }).join('');
+    // 손글씨 테마에서만 보이는 펜 테두리(안 · 밖)
+    const ink = [r + 5.5, r - 5.5].map(x => `<circle class="donut-ink" r="${x}" cx="${size / 2}" cy="${size / 2}" fill="none"/>`).join('');
+    return `<svg class="donut" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="구분별 경비"><g transform="rotate(-90 ${size / 2} ${size / 2})">${segs}${ink}</g></svg>`;
   };
   // 경비 표의 '일차' 열로 날을 나눈다. '공통'은 여행 일수로 나누고, '준비'는 출발 전 비용으로 따로 둔다
   const dayCost = d => {
@@ -553,7 +555,7 @@
       if (k === n) { budget += lineKrw(l, b); actual += l.actual || 0; add(l, lineKrw(l, b)); }
       else if (/공통/.test(l.day)) { common += lineKrw(l, b) / ds.length; actual += (l.actual || 0) / ds.length; add(l, lineKrw(l, b) / ds.length); }
     });
-    const parts = COST_CATS.map((c, i) => ({ cat: c, v: byCat[c] || 0, color: COST_COLORS[i] })).filter(x => x.v > 0.5);
+    const parts = COST_CATS.map((c, i) => ({ cat: c, v: byCat[c] || 0, color: COST_COLORS[i], i })).filter(x => x.v > 0.5);
     return { budget: budget + common, own: budget, common, actual, parts };
   };
 
@@ -595,7 +597,7 @@
       <div class="timetable${ds.length === 1 ? ' one' : ''}" style="--days:${ds.length};--startH:${startH}">
         <div class="tt-head"><span class="tt-corner">시간</span>${ds.map((d, i) => `<button class="tt-day${d === t ? ' today' : ''}" data-sday="${d}" data-smode-to="board">${days().indexOf(d) + 1}일차 <small>${fmtShort(d)}</small></button>`).join('')}</div>
         <div class="tt-info"><span class="tt-corner">하루</span>${ds.map(d => { const L = dayLoad(d), C = dayCost(d);
-          return `<div class="tt-dinfo">${L ? `<div class="load ${L.key}" title="부담 점수 ${L.score}"><span class="load-chip">${L.face} ${L.label}</span><span class="load-bar"><i style="width:${L.pct}%"></i></span></div>` : ''}${C ? `<div class="day-cost"><p><span>예상 경비</span><b>${won(C.budget)}</b>${C.actual ? `<em>실제 ${won(C.actual)}</em>` : ''}</p>${C.parts.length ? `<div class="cost-pie">${donut(C.parts, C.budget, PHONE.matches && ds.length === 1 ? 96 : 76)}<ul class="cost-legend">${C.parts.map(x => `<li><i style="background:${x.color}"></i><span>${x.cat}</span><b>${won(x.v)}</b><small>${Math.round(x.v / C.budget * 100)}%</small></li>`).join('')}</ul></div>` : ''}</div>` : ''}</div>`; }).join('')}</div>
+          return `<div class="tt-dinfo">${L ? `<div class="load ${L.key}" title="부담 점수 ${L.score}"><span class="load-chip">${L.face} ${L.label}</span><span class="load-bar"><i style="width:${L.pct}%"></i></span></div>` : ''}${C ? `<div class="day-cost"><p><span>예상 경비</span><b>${won(C.budget)}</b>${C.actual ? `<em>실제 ${won(C.actual)}</em>` : ''}</p>${C.parts.length ? `<div class="cost-pie">${donut(C.parts, C.budget, PHONE.matches && ds.length === 1 ? 96 : 76)}<ul class="cost-legend">${C.parts.map(x => `<li><i style="background:var(--cc${x.i}, ${x.color})"></i><span>${x.cat}</span><b>${won(x.v)}</b><small>${Math.round(x.v / C.budget * 100)}%</small></li>`).join('')}</ul></div>` : ''}</div>` : ''}</div>`; }).join('')}</div>
         <div class="tt-body"><div class="tt-hours" style="--total:${total}">${hours}</div>${ds.map(col).join('')}</div>
       </div>`;
   };
