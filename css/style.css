@@ -5,8 +5,8 @@
   --bg-subtle: #F3EEE0;
   --ink: #1E1E1E;
   --text-primary: #1E1E1E;
-  --text-secondary: #4A4740;
-  --text-tertiary: #8F8A7E;
+  --text-secondary: #3F3C35;
+  --text-tertiary: #6F6A5E;
   --brand: #2B59C3;
   --highlight: #FFF0A0;
   --accent: #E8553B;
@@ -36,7 +36,7 @@ body {
   color: var(--text-primary);
   font-family: var(--font-ko);
   font-size: 17px;
-  line-height: 1.35;
+  line-height: 1.4;
   -webkit-tap-highlight-color: transparent;
 }
 button, input, select { font: inherit; color: inherit; }
@@ -726,13 +726,13 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
 .cost-legend i { width: 10px; height: 10px; border-radius: 3px; }
 .cost-legend span { color: var(--text-secondary); white-space: nowrap; }
 .cost-legend b { justify-self: end; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.cost-legend small { width: 32px; text-align: right; color: var(--text-tertiary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.cost-legend small { min-width: 32px; text-align: right; color: var(--text-tertiary); font-size: 12px; font-variant-numeric: tabular-nums; }
 @media (max-width: 1300px) and (min-width: 960px) { .cost-pie { flex-direction: column; align-items: stretch; } .cost-pie .donut { align-self: center; } }
 @media (max-width: 959px) { .timetable.one .cost-pie { gap: 18px; } .timetable.one .cost-legend li { font-size: 15px; } .timetable.one .cost-legend small { font-size: 13px; width: 38px; } }
 .cost-pie svg.donut { width: 76px; height: 76px; }
-.cost-legend li { grid-template-columns: 10px 3.2em 1fr 34px; }
+.cost-legend li { grid-template-columns: 10px 3.2em 1fr minmax(34px, auto); }
 .day-cost .cost-legend b { font-size: 13.5px; font-weight: 700; }
-@media (max-width: 959px) { .timetable.one .cost-pie svg.donut { width: 96px; height: 96px; } .timetable.one .day-cost .cost-legend b { font-size: 15px; } .timetable.one .cost-legend li { grid-template-columns: 12px 3.4em 1fr 40px; } }
+@media (max-width: 959px) { .timetable.one .cost-pie svg.donut { width: 96px; height: 96px; } .timetable.one .day-cost .cost-legend b { font-size: 15px; } .timetable.one .cost-legend li { grid-template-columns: 12px 3.4em 1fr minmax(40px, auto); } }
 .tt-dinfo .day-cost { border-top: 0; padding-top: 2px; }
 .brand-mark.brand-img, :root[data-skin="journey"] .brand-mark.brand-img { width: 38px; height: 38px; padding: 0; border: 0; background: none; border-radius: 11px; box-shadow: 0 4px 12px rgba(198,76,255,.3); }
 
@@ -754,3 +754,7 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
 .xp-qty button { width: 44px; min-height: 44px; border-radius: var(--r-sm); background: var(--bg-subtle); border: 0; font-size: 20px; font-weight: 700; color: var(--text-secondary); }
 .xp-sum { margin: 0; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .xp-sum b { color: var(--text-primary); font-size: 18px; margin-left: 4px; }
+
+/* 손글씨 테마 가독성: 개구체는 한글 사이 간격이 넓어 조금 좁힌다 */
+:root[data-skin="sketch"] body, :root[data-skin="sketch"] button, :root[data-skin="sketch"] input, :root[data-skin="sketch"] select, :root[data-skin="sketch"] textarea { letter-spacing: -.04em; }
+:root[data-skin="sketch"] .display, :root[data-skin="sketch"] .hero-time { letter-spacing: 0; }
