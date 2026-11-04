@@ -746,12 +746,22 @@
       const r = await fetch('https://open.er-api.com/v6/latest/KRW');
       const j = await r.json();
       if (j.result !== 'success') throw new Error('rate');
-      rates.data = { at: Date.now(), rates: j.rates };
+      rates.data = { at: Date.now(), rates: j.rates, updated: (j.time_last_update_unix || 0) * 1000 || Date.now() };
       store.set('rates', rates.data);
       rates.failed = false;
     } catch { rates.failed = true; }
     rates.loading = false;
     renderWidgets(true);
+  };
+  // 핑트립을 열 때마다 경비 환율을 오늘 환율로 바꾼다(환율을 못 받으면 마지막 값 그대로)
+  const applyLiveRate = () => {
+    const b = state.extras && state.extras.budget;
+    if (!b || !b.foreign || b.foreign === 'KRW' || !rates.data || !rates.data.rates[b.foreign]) return;
+    const rate = 1 / rates.data.rates[b.foreign], d = new Date(rates.data.updated || rates.data.at);
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (Math.abs((b.rate || 0) - rate) < 1e-6 && b.rateDate === day) return;
+    b.rate = rate; b.rateDate = day; b.rateAuto = true;
+    save(); if (state.view === 'budget') renderBudget(); render(true);
   };
   const krwPer = cur => {
     if (cur === 'KRW') return 1;
@@ -890,7 +900,7 @@
     const p = state.pending;
     if (!p || !p.items || !p.items.length) return;
     state.items = p.items;
-    state.extras = p.extras === undefined ? parseExtras(p.book) : p.extras;
+    state.extras = p.extras === undefined ? parseExtras(p.book) : p.extras; applyLiveRate();
     state.fired = {}; state.snooze = {};
     // 이미 지난 알림은 한꺼번에 울리지 않도록 보낸 것으로 표시한다
     const now = Date.now();
@@ -1360,7 +1370,7 @@
           <div><span class="muted small">${b.foreign === 'JPY' ? '엔화' : b.foreign} 준비</span><b>${yen(foreignSum, b.foreign)}</b></div>
           <div><span class="muted small">원화 결제</span><b>${won(krwSum)}</b></div>
         </div>
-        <label class="rate">환율 <span>100${b.foreign === 'JPY' ? '엔' : ' ' + b.foreign} =</span><input id="budget-rate" inputmode="decimal" value="${per100}" aria-label="100${b.foreign} 당 원화"><span>원${b.rateDate ? ` · ${esc(b.rateDate)} 기준` : ''}</span></label>
+        <label class="rate">환율 <span>100${b.foreign === 'JPY' ? '엔' : ' ' + b.foreign} =</span><input id="budget-rate" inputmode="decimal" value="${per100}" aria-label="100${b.foreign} 당 원화"><span>원${b.rateDate ? ` · ${esc(b.rateDate)} ${b.rateAuto ? '실시간 ' : ''}기준` : ''}</span></label>
         <button class="btn btn-primary exp-add-main" data-exp-add="">${icon('plus')}경비 추가</button>
       </div>
       <div class="card">
@@ -1679,7 +1689,7 @@
     if (t.dataset.manualRate != null) { const v = parseFloat(t.value.replace(/,/g, '')); if (v > 0) { store.set('manualRate.' + city().cur, v); renderWidgets(); } }
     const b = state.extras && state.extras.budget;
     if (b && t.dataset.actual != null) { const v = num(t.value); b.lines[+t.dataset.actual].actual = v > 0 ? v : null; save(); renderBudget(); }
-    if (b && t.id === 'budget-rate') { const v = num(t.value); if (v > 0) { b.rate = v / 100; save(); } renderBudget(); }
+    if (b && t.id === 'budget-rate') { const v = num(t.value); if (v > 0) { b.rate = v / 100; b.rateAuto = false; b.rateDate = todayStr(); save(); } renderBudget(); }
   });
   document.addEventListener('input', e => {
     const t = e.target;
@@ -1814,6 +1824,7 @@
       state.items.forEach(it => { if (known.has(it.id)) return; const l = leadOf(it); if (l != null && startMs(it) - l * 60000 < now - 60000) state.fired[it.id] = true; });
     }
     sync.lastJson = JSON.stringify(sharedState());
+    if (changed) applyLiveRate();
     save();
     setSyncStatus('synced');
     if (changed) {
@@ -1938,13 +1949,13 @@
       if (keepItems) {
         // 같은 여행(날짜가 겹치는 일정)일 때만 표를 붙인다
         const presetDays = new Set(items.map(i => i.date));
-        if (state.items.some(i => presetDays.has(i.date))) { state.extras = parseExtras(book); save(); render(); }
+        if (state.items.some(i => presetDays.has(i.date))) { state.extras = parseExtras(book); save(); render(); applyLiveRate(); }
         return;
       }
       if (cfg.city && CITIES.some(c => c.id === cfg.city)) state.settings.city = cfg.city;
       if (cfg.tripName) state.settings.tripName = cfg.tripName;
       state.items = items;
-      state.extras = parseExtras(book);
+      state.extras = parseExtras(book); applyLiveRate();
       const now = Date.now();
       items.forEach(it => { const l = leadOf(it); if (l != null && startMs(it) - l * 60000 < now - 60000) state.fired[it.id] = true; });
       state.day = null;
@@ -2000,7 +2011,7 @@
       catch (x) { err.textContent = authMsg(x); err.hidden = false; }
     }
   });
-  loadRates(); loadWeather();
+  loadRates().then(applyLiveRate); loadWeather();
   checkAlerts();
   setInterval(tickCountdown, 1000);
   setInterval(checkAlerts, 10000);
