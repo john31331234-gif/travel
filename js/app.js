@@ -405,7 +405,7 @@
     const c = city(), now = Date.now(), ds = days(), t = todayStr();
     const idx = ds.indexOf(t);
     $('#today-eyebrow').textContent = ds.length ? (idx >= 0 ? `여행 ${idx + 1}일차 · ${fmtDate(t)}` : t < ds[0] ? `출발까지 ${fmtLeftWords(zonedToEpoch(ds[0], '00:00', c.tz) - now)} · ${fmtDate(t)}` : `여행 끝! · ${fmtDate(t)}`) : fmtDate(t);
-    $$('.city-name').forEach(e => { e.textContent = c.en; });
+    $$('.city-name').forEach(e => { e.textContent = c.name; });
     $$('.city-label').forEach(e => { e.textContent = `${c.name}, ${c.country}`; });
 
     if (!state.day || !ds.includes(state.day)) state.day = ds.includes(t) ? t : (ds.find(d => d >= t) || ds[ds.length - 1] || null);
@@ -438,14 +438,14 @@
     }
     const cur = currentItem(now), nx = nextItem(now);
     const it = nx && (!cur || startMs(nx) - now < 30 * 60000) ? nx : (cur || nx);
-    if (!it) { box.innerHTML = `<div class="hero empty"><h2 class="hero-title">모든 일정을 마쳤어요 🎉</h2><p class="muted">즐거운 여행이었길!</p></div>`; return; }
+    if (!it) { box.innerHTML = `<div class="hero empty"><h2 class="hero-title">모든 일정을 마쳤어요</h2><p class="muted">새 여행은 엑셀 업로드에서 올리면 돼요.</p></div>`; return; }
     const s = startMs(it), lead = leadOf(it), ongoing = s <= now;
     const alertAt = lead == null ? null : s - lead * 60000;
     const badge = ongoing ? '지금 진행 중' : alertAt == null ? '알림 꺼짐' : alertAt > now ? `${timeIn(alertAt, city().tz)} 알림 예정` : '알림 보냄';
     box.innerHTML = `<div class="hero-wrap"><div class="hero" data-hero="${esc(it.id)}">
       <div class="hero-top">
         <span class="badge">${icon('bell')}${badge}</span>
-        <span class="doodle-circle"><span class="countdown" id="countdown" aria-label="시작까지 남은 시간">${ongoing ? '진행 중' : fmtLeft(s - now)}</span></span>
+        <span class="countdown" id="countdown" aria-label="시작까지 남은 시간">${ongoing ? '진행 중' : fmtLeft(s - now)}</span>
       </div>
       <div>
         <div class="hero-time">${it.time}${it.date !== todayStr() ? ` <span style="font-size:24px">${fmtShort(it.date)}</span>` : ''}</div>
@@ -456,7 +456,7 @@
         <a class="btn" href="${itemMap(it)}" target="_blank" rel="noopener">${icon('ext')}지도 열기</a>
         <button class="btn" data-open="${esc(it.id)}">자세히 보기</button>
       </div>
-    </div>${!ongoing && s - now < 60 * 60000 ? '<span class="hand-note hero-note">곧 출발!</span>' : ''}</div>`;
+    </div></div>`;
   };
 
   const tickCountdown = () => {
@@ -473,7 +473,7 @@
   // ---------- 여정 지도 (여정 지도 테마의 일정 탭) ----------
   // 하루를 시간대 단계로 나누고, 단계마다 일정(포스트잇)과 컨디션 곡선을 쌓는다. 문제점은 옆 칸(checksHtml)에 짧게 모은다.
   const STAGES = [['dawn', '새벽 · 아침', 0, 9], ['morning', '오전', 9, 12], ['noon', '점심', 12, 14], ['afternoon', '오후', 14, 18], ['evening', '저녁', 18, 21], ['night', '밤', 21, 24]];
-  const FACE = ['😟', '😐', '🙂', '😊'];
+  const FACE = ['', '', '', ''];
   const scoreOf = it => { const tr = transportFor(it); if (tr && tr.level === 'late') return 0; if (tr && tr.level === 'tight') return 1; return /food|onsen|rest/.test(catKey(it.category)) ? 3 : 2; };
   const journeyDay = (d, n, now) => {
     const items = state.items.filter(it => it.date === d);
@@ -505,7 +505,7 @@
   // 일정 종류별로 1시간에 드는 힘을 더하고(쉬는 일정은 회복으로 뺀다), 이른 시작 · 늦은 마무리 · 걷는 이동 ·
   // 갈아타기 · 지연/빠듯 구간을 더해 점수를 낸다. 같은 점수라도 체력(약함 · 보통 · 강함)에 따라 판정이 달라진다.
   const STAMINA = [['weak', '약함'], ['normal', '보통'], ['strong', '강함']];
-  const LOAD_LV = [['easy', '여유', '😌'], ['ok', '적당', '🙂'], ['hard', '힘듦', '😮‍💨'], ['over', '무리', '🥵']];
+  const LOAD_LV = [['easy', '여유', ''], ['ok', '적당', ''], ['hard', '힘듦', ''], ['over', '무리', '']];
   const LOAD_CUT = { weak: [6, 9, 12], normal: [9, 13, 17], strong: [11, 16, 21] };
   const PER_HOUR = { sight: 1.2, move: 0.9, prep: 0.7, etc: 0.8, none: 0.8, food: 0.3, free: 0.1, rest: -0.5, onsen: -0.6 };
   const dayLoad = d => {
@@ -597,7 +597,7 @@
       <div class="timetable${ds.length === 1 ? ' one' : ''}" style="--days:${ds.length};--startH:${startH}">
         <div class="tt-head"><span class="tt-corner">시간</span>${ds.map((d, i) => `<button class="tt-day${d === t ? ' today' : ''}" data-sday="${d}" data-smode-to="board">${days().indexOf(d) + 1}일차 <small>${fmtShort(d)}</small></button>`).join('')}</div>
         <div class="tt-info"><span class="tt-corner">하루</span>${ds.map(d => { const L = dayLoad(d), C = dayCost(d);
-          return `<div class="tt-dinfo">${L ? `<div class="load ${L.key}" title="부담 점수 ${L.score}"><span class="load-chip">${L.face} ${L.label}</span><span class="load-bar"><i style="width:${L.pct}%"></i></span></div>` : ''}${C ? `<div class="day-cost"><p><span>예상 경비</span><b>${won(C.budget)}</b>${C.actual ? `<em>실제 ${won(C.actual)}</em>` : ''}</p>${C.parts.length ? `<div class="cost-pie">${donut(C.parts, C.budget, PHONE.matches && ds.length === 1 ? 96 : 76)}<ul class="cost-legend">${C.parts.map(x => `<li><i style="background:var(--cc${x.i}, ${x.color})"></i><span>${x.cat}</span><b>${won(x.v)}</b><small>${Math.round(x.v / C.budget * 100)}%</small></li>`).join('')}</ul></div>` : ''}</div>` : ''}</div>`; }).join('')}</div>
+          return `<div class="tt-dinfo">${L ? `<div class="load ${L.key}" title="부담 점수 ${L.score}"><span class="load-chip">${L.label}</span><span class="load-bar"><i style="width:${L.pct}%"></i></span></div>` : ''}${C ? `<div class="day-cost"><p><span>예상 경비</span><b>${won(C.budget)}</b>${C.actual ? `<em>실제 ${won(C.actual)}</em>` : ''}</p>${C.parts.length ? `<div class="cost-pie">${donut(C.parts, C.budget, PHONE.matches && ds.length === 1 ? 96 : 76)}<ul class="cost-legend">${C.parts.map(x => `<li><i style="background:var(--cc${x.i}, ${x.color})"></i><span>${x.cat}</span><b>${won(x.v)}</b><small>${Math.round(x.v / C.budget * 100)}%</small></li>`).join('')}</ul></div>` : ''}</div>` : ''}</div>`; }).join('')}</div>
         <div class="tt-body"><div class="tt-hours" style="--total:${total}">${hours}</div>${ds.map(col).join('')}</div>
       </div>`;
   };
@@ -1335,7 +1335,7 @@
     const mini = s => `<li class="mini ${s.level}"><b><span class="${LEVEL[s.level][0]}">${LEVEL[s.level][1]}</span>${esc(s.seg)}</b>${s.note ? `<span>${esc(s.note)}</span>` : ''}${s.level !== 'ok' && s.itemId ? `<button class="mini-fix" data-fix-seg="${esc(s.itemId)}">${icon('check')}수정</button>` : ''}</li>`;
     return `<div class="card checks">
       <h3 class="card-title">${icon('clock')}문제점${segs.length ? `<span class="right small">지연 ${cnt('late')} · 빠듯 ${cnt('tight')}</span>` : ''}</h3>
-      ${issues.length ? `<ul class="minis">${issues.map(mini).join('')}</ul>` : ''}${issues.every(s => s.level === 'ok') ? '<p class="muted small">문제 구간이 없어요 👍</p>' : ''}
+      ${issues.length ? `<ul class="minis">${issues.map(mini).join('')}</ul>` : ''}${issues.every(s => s.level === 'ok') ? '<p class="muted small">문제 구간이 없어요</p>' : ''}
       ${segs.length > issues.length ? `<details class="more"><summary>여유 구간 ${segs.length - issues.length}곳</summary><ul class="minis">${segs.filter(s => !issues.includes(s)).map(mini).join('')}</ul></details>` : ''}
       ${reviews.length ? `<details class="more"><summary>수정안 ${reviews.length}건</summary><ul class="minis">${reviews.map(r => `<li class="mini fix"><b>${esc(r.seg)}</b><span>${esc(r.after)}</span></li>`).join('')}</ul></details>` : ''}
     </div>`;
@@ -1390,7 +1390,7 @@
         return `<div class="card">
           <h3 class="card-title">${icon('calendar')}일별 경비<span class="right">여행 중 하루 평균 ${won(avg)}</span></h3>
           <div class="day-costs">${rows.map(r => `<div class="dc-row">
-            <div class="dc-name"><b>${r.name} ${r.face || ''}</b><span class="muted small">${esc(r.sub)}</span></div>
+            <div class="dc-name"><b>${r.name}</b><span class="muted small">${esc(r.sub)}</span></div>
             <div class="dc-bar"><span style="width:${r.budget / max * 100}%"></span>${r.actual ? `<em class="${r.actual > r.budget ? 'over' : ''}" style="width:${r.actual / max * 100}%"></em>` : ''}</div>
             <div class="dc-num"><b>${won(r.budget)}</b>${r.actual ? `<span class="small ${r.actual > r.budget ? 'neg' : 'muted'}">실제 ${won(r.actual)}</span>` : ''}</div>
           </div>`).join('')}</div>

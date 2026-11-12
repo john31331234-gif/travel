@@ -17,9 +17,9 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Urbanist:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/gaegu.css?v=1">
-  <link rel="stylesheet" href="css/style.css?v=41">
+  <link rel="stylesheet" href="css/style.css?v=42">
 </head>
 <body>
   <div class="app">
@@ -45,7 +45,7 @@
         <header class="page-head">
           <div>
             <p class="eyebrow" id="today-eyebrow"></p>
-            <h1 class="display" id="today-title"><span class="city-name"></span><span class="doodle-underline" aria-hidden="true"></span></h1>
+            <h1 class="display" id="today-title"><span class="city-name"></span></h1>
           </div>
           <button class="loc-btn" data-view="settings" aria-label="여행지 바꾸기"><svg><use href="#i-pin"/></svg><span class="city-label"></span> ▾</button>
         </header>
@@ -54,7 +54,7 @@
             <div id="next-alert"></div>
             <div class="pills" id="day-pills" role="tablist" aria-label="여행 날짜"></div>
             <div class="section-head">
-              <h2 id="list-title">오늘 일정 <span class="doodle-star" aria-hidden="true"></span></h2>
+              <h2 id="list-title">오늘 일정</h2>
               <span class="btn-row">
                 <button class="link" data-add="" id="today-add"><svg><use href="#i-plus"/></svg>추가</button>
                 <button class="link" data-view="schedule">전체 보기</button>
@@ -70,8 +70,7 @@
       <section class="view" id="view-schedule" hidden>
         <header class="page-head">
           <div>
-            <p class="eyebrow">엑셀에서 불러온 일정</p>
-            <h1 class="display">Schedule</h1>
+            <h1 class="display">전체 일정</h1>
           </div>
           <span class="btn-row">
             <button class="btn btn-primary" data-add=""><svg><use href="#i-plus"/></svg>일정 추가</button>
@@ -87,8 +86,7 @@
       <section class="view" id="view-budget" hidden>
         <header class="page-head">
           <div>
-            <p class="eyebrow">엑셀 "여행경비" 표</p>
-            <h1 class="display">Budget</h1>
+            <h1 class="display">여행 경비</h1>
           </div>
         </header>
         <div class="budget-grid" id="budget-body"></div>
@@ -98,7 +96,6 @@
       <section class="view" id="view-upload" hidden>
         <header class="page-head">
           <div>
-            <p class="eyebrow">일정 불러오기</p>
             <h1 class="title">엑셀로 여행 일정을 한 번에 등록해요</h1>
           </div>
           <button class="link" id="template-btn">양식 다운로드 (.xlsx)</button>
@@ -107,9 +104,9 @@
           <div class="upload-main">
             <label class="drop" id="drop">
               <input type="file" id="file-input" accept=".xlsx,.xls,.csv" hidden>
-              <span class="drop-note" aria-hidden="true">여기 톡!</span>
+              
               <span class="drop-icon"><svg><use href="#i-upload"/></svg></span>
-              <strong>파일 선택하기<span class="doodle-underline" aria-hidden="true"></span></strong>
+              <strong>파일 선택하기</strong>
               <span class="muted">끌어다 놓거나 눌러서 선택 · .xlsx · .xls · .csv</span>
             </label>
             <div id="upload-result"></div>
@@ -137,8 +134,7 @@
       <section class="view" id="view-tools" hidden>
         <header class="page-head">
           <div>
-            <p class="eyebrow">여행 도구</p>
-            <h1 class="display">Toolkit</h1>
+            <h1 class="display">여행 도구</h1>
           </div>
         </header>
         <div class="widgets tools-grid" data-widgets></div>
@@ -148,8 +144,7 @@
       <section class="view" id="view-settings" hidden>
         <header class="page-head">
           <div>
-            <p class="eyebrow">설정</p>
-            <h1 class="display">Settings</h1>
+            <h1 class="display">설정</h1>
           </div>
         </header>
         <div class="settings-grid">
@@ -160,7 +155,7 @@
           <div class="card">
             <h3 class="card-title"><svg><use href="#i-calendar"/></svg>내 체력</h3>
             <div class="pills wrap" id="stamina-pills"></div>
-            <p class="muted small">전체 일정의 하루 판정(😌 여유 · 🙂 적당 · 😮‍💨 힘듦 · 🥵 무리)이 이 체력에 맞춰 바뀌어요.</p>
+            <p class="muted small">전체 일정의 하루 판정(여유 · 적당 · 힘듦 · 무리)이 이 체력에 맞춰 바뀌어요.</p>
           </div>
           <div class="card">
             <h3 class="card-title"><svg><use href="#i-dash"/></svg>화면 테마</h3>
@@ -254,6 +249,6 @@
   <script src="vendor/firebase/firebase-app-compat.js"></script>
   <script src="vendor/firebase/firebase-auth-compat.js"></script>
   <script src="vendor/firebase/firebase-firestore-compat.js"></script>
-  <script src="js/app.js?v=41"></script>
+  <script src="js/app.js?v=42"></script>
 </body>
 </html>
