@@ -454,7 +454,7 @@
       </div>
       <div class="hero-actions">
         <a class="btn" href="${itemMap(it)}" target="_blank" rel="noopener">${icon('ext')}지도 열기</a>
-        <button class="btn" data-open="${esc(it.id)}">자세히</button>
+        <button class="btn" data-open="${esc(it.id)}">자세히 보기</button>
       </div>
     </div>${!ongoing && s - now < 60 * 60000 ? '<span class="hand-note hero-note">곧 출발!</span>' : ''}</div>`;
   };
@@ -828,7 +828,7 @@
         : `<label class="field"><span>환율 직접 입력 (1 ${c.cur} = ? 원)</span><input inputmode="decimal" data-manual-rate placeholder="예: 1480"></label>`}
       </div>
       <div class="card">
-        <h3 class="card-title">${icon('weather')}${c.name} 날씨<a class="link right" style="min-height:auto" href="${mapUrl(c.en)}" target="_blank" rel="noopener">지도 ↗</a></h3>
+        <h3 class="card-title">${icon('weather')}${c.name} 날씨<a class="link right" href="${mapUrl(c.en)}" target="_blank" rel="noopener">지도 ↗</a></h3>
         ${wHtml}
       </div>
       <div class="card">
