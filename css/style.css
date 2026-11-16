@@ -878,3 +878,15 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
 :root[data-skin="sketch"] .tt-dinfo .cost-legend li, :root[data-skin="sketch"] .tt-dinfo .cost-legend b { font-size: 15px; }
 @media (max-width: 1300px) and (min-width: 960px) { :root .tt-dinfo .cost-pie { flex-direction: column; } :root .tt-dinfo .cost-legend { align-self: stretch; } }
 @media (max-width: 959px) { :root .timetable.one .tt-dinfo .cost-pie svg.donut { width: 84px; height: 84px; } :root .timetable.one .tt-dinfo .cost-legend li, :root .timetable.one .tt-dinfo .cost-legend b { font-size: 15px; } .timetable.one .dinfo-total b { font-size: 22px; } }
+
+/* 손그림 노트: 큰 글씨는 연필 손글씨, 작은 글씨는 또렷한 고운돋움 (손글씨는 작으면 뭉개진다) */
+:root[data-skin="sketch"] { --font-small: "Gowun Dodum", "Apple SD Gothic Neo", sans-serif; }
+:root[data-skin="sketch"] :is(small, .small, .muted, .chip, .tab, .tt-block, .tt-hours span, .tt-hint, .tt-corner, .tt-day small, .s-time span, .s-meta, .actual, .card-title .right, .badge, .clock span, .cost-legend, .sync-note, .exp-add, .tt-issues-l, .dinfo-total small, .eyebrow, .field > span, label > span, .exp-main .link, .rate span) { font-family: var(--font-small); letter-spacing: -.01em; }
+:root[data-skin="sketch"] :is(.small, .muted.small, .s-meta, .actual .small, .card-title .right, .eyebrow) { font-size: 15px; }
+:root[data-skin="sketch"] .s-time span { font-size: 14px; }
+:root[data-skin="sketch"] .chip { font-size: 14px; font-weight: 700; }
+:root[data-skin="sketch"] .tab { font-size: 14px; font-weight: 700; }
+:root[data-skin="sketch"] .tt-block { font-size: 14px; } :root[data-skin="sketch"] .tt-block small { font-size: 12px; font-weight: 700; }
+:root[data-skin="sketch"] .tt-block span { font-weight: 700; }
+:root[data-skin="sketch"] .tt-hint { font-size: 14px; }
+:root[data-skin="sketch"] .tt-hours span { font-family: var(--font-small); font-size: 13px; }
