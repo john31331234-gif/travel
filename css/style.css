@@ -890,3 +890,16 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
 :root[data-skin="sketch"] .tt-block span { font-weight: 700; }
 :root[data-skin="sketch"] .tt-hint { font-size: 14px; }
 :root[data-skin="sketch"] .tt-hours span { font-family: var(--font-small); font-size: 13px; }
+
+/* 일별 경비: 일차 이름 · 금액이 아래 설명보다 크게 */
+.dc-name { gap: 2px; } .dc-name b { font-size: 17px; line-height: 1.2; } .dc-num b { font-size: 17px; }
+:root .dc-name .muted.small { font-size: 13px; line-height: 1.35; }
+:root[data-skin="sketch"] .dc-name b { font-size: 21px; }
+:root[data-skin="sketch"] .dc-num b { font-family: var(--font-hand); font-size: 20px; }
+:root[data-skin="sketch"] .dc-name .muted.small { font-size: 14px; }
+.day-costs { gap: 16px; }
+@media (max-width: 600px) {
+  :root .dc-row { grid-template-columns: 1fr auto; grid-template-areas: "name num" "bar bar"; row-gap: 8px; }
+  :root .dc-name { grid-area: name; } :root .dc-num { grid-area: num; align-self: start; } :root .dc-bar { grid-area: bar; }
+  .day-costs { gap: 18px; }
+}
