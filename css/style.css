@@ -860,3 +860,21 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
 /* 연필 글씨: 감자꽃체 + 큰 제목에만 흑연 결 */
 :root[data-skin="sketch"] body { font-size: 18px; }
 :root[data-skin="sketch"] .display, :root[data-skin="sketch"] .hero-time, :root[data-skin="sketch"] .hero-title, :root[data-skin="sketch"] .card-title, :root[data-skin="sketch"] #list-title { filter: url(#pencil); }
+
+/* 시간표 하루 요약: 판정 · 합계 한 줄, 큰 구분 셋, 넉넉한 여백 */
+:root .tt-dinfo { gap: 14px; padding: 16px 18px; }
+.dinfo-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.dinfo-top .load { display: inline-flex; }
+.dinfo-total { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+.dinfo-total small { font-size: 12px; color: var(--text-tertiary); }
+.dinfo-total b { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+:root .tt-dinfo .cost-pie { flex-direction: row; align-items: center; gap: 16px; }
+:root .tt-dinfo .cost-pie svg.donut { width: 64px; height: 64px; align-self: center; }
+:root .tt-dinfo .cost-legend { gap: 6px; max-width: none; width: auto; align-self: center; }
+:root .tt-dinfo .cost-legend li { grid-template-columns: 10px 1fr auto; gap: 8px; font-size: 13px; }
+:root .tt-dinfo .cost-legend span { color: var(--text-secondary); }
+:root .tt-dinfo .cost-legend b { font-size: 13px; font-weight: 600; font-family: inherit; }
+:root[data-skin="sketch"] .dinfo-total b { font-family: var(--font-hand); font-size: 22px; }
+:root[data-skin="sketch"] .tt-dinfo .cost-legend li, :root[data-skin="sketch"] .tt-dinfo .cost-legend b { font-size: 15px; }
+@media (max-width: 1300px) and (min-width: 960px) { :root .tt-dinfo .cost-pie { flex-direction: column; } :root .tt-dinfo .cost-legend { align-self: stretch; } }
+@media (max-width: 959px) { :root .timetable.one .tt-dinfo .cost-pie svg.donut { width: 84px; height: 84px; } :root .timetable.one .tt-dinfo .cost-legend li, :root .timetable.one .tt-dinfo .cost-legend b { font-size: 15px; } .timetable.one .dinfo-total b { font-size: 22px; } }

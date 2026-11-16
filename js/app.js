@@ -597,7 +597,10 @@
       <div class="timetable${ds.length === 1 ? ' one' : ''}" style="--days:${ds.length};--startH:${startH}">
         <div class="tt-head"><span class="tt-corner">시간</span>${ds.map((d, i) => `<button class="tt-day${d === t ? ' today' : ''}" data-sday="${d}" data-smode-to="board">${days().indexOf(d) + 1}일차 <small>${fmtShort(d)}</small></button>`).join('')}</div>
         <div class="tt-info"><span class="tt-corner">하루</span>${ds.map(d => { const L = dayLoad(d), C = dayCost(d);
-          return `<div class="tt-dinfo">${L ? `<div class="load ${L.key}" title="부담 점수 ${L.score}"><span class="load-chip">${L.label}</span><span class="load-bar"><i style="width:${L.pct}%"></i></span></div>` : ''}${C ? `<div class="day-cost"><p><span>예상 경비</span><b>${won(C.budget)}</b>${C.actual ? `<em>실제 ${won(C.actual)}</em>` : ''}</p>${C.parts.length ? `<div class="cost-pie">${donut(C.parts, C.budget, PHONE.matches && ds.length === 1 ? 96 : 76)}<ul class="cost-legend">${C.parts.map(x => `<li><i style="background:var(--cc${x.i}, ${x.color})"></i><span>${x.cat}</span><b>${won(x.v)}</b><small>${Math.round(x.v / C.budget * 100)}%</small></li>`).join('')}</ul></div>` : ''}</div>` : ''}</div>`; }).join('')}</div>
+          // 하루 요약은 판정 · 경비 합계 · 큰 구분 셋만 (나머지는 '그 외'로 묶는다)
+          const parts = C ? [...C.parts].sort((a, b) => b.v - a.v) : [];
+          const shown = parts.length > 3 ? parts.slice(0, 2).concat({ cat: '그 외', v: parts.slice(2).reduce((x, p) => x + p.v, 0), color: '#B9BFBD', i: 'x' }) : parts;
+          return `<div class="tt-dinfo">${L || C ? `<div class="dinfo-top">${L ? `<span class="load ${L.key}" title="부담 점수 ${L.score}"><span class="load-chip">${L.label}</span></span>` : ''}${C ? `<span class="dinfo-total" title="예상 경비${C.actual ? ` · 실제 ${won(C.actual)}` : ''}"><small>예상 경비</small><b>${won(C.budget)}</b></span>` : ''}</div>` : ''}${shown.length ? `<div class="cost-pie">${donut(shown, C.budget, PHONE.matches && ds.length === 1 ? 84 : 64)}<ul class="cost-legend">${shown.map(x => `<li title="${x.cat} ${Math.round(x.v / C.budget * 100)}%"><i style="background:var(--cc${x.i}, ${x.color})"></i><span>${x.cat}</span><b>${won(x.v)}</b></li>`).join('')}</ul></div>` : ''}</div>`; }).join('')}</div>
         <div class="tt-body"><div class="tt-hours" style="--total:${total}">${hours}</div>${ds.map(col).join('')}</div>
       </div>`;
   };
