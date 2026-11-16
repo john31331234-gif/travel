@@ -4,8 +4,8 @@
   --bg-surface: #FFFDF7;
   --bg-subtle: #F3EEE0;
   --ink: #1E1E1E;
-  --text-primary: #1E1E1E;
-  --text-secondary: #3F3C35;
+  --text-primary: #2B2B30;
+  --text-secondary: #45434A;
   --text-tertiary: #6F6A5E;
   --brand: #2B59C3;
   --highlight: #FFF0A0;
@@ -17,8 +17,8 @@
   --warning: #B45309;
   --warning-soft: #FEF3C7;
 
-  --font-ko: "Gaegu", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-  --font-hand: "Caveat", "Gaegu", cursive;
+  --font-ko: "Gamja Flower", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-hand: "Gamja Flower", "Apple SD Gothic Neo", cursive;
 
   --r-card: 20px 8px 24px 10px / 10px 20px 9px 22px;
   --r-sm: 12px 5px 14px 6px / 6px 12px 5px 14px;
@@ -754,7 +754,7 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
 .xp-sum b { color: var(--text-primary); font-size: 18px; margin-left: 4px; }
 
 /* 손글씨 테마 가독성: 개구체는 한글 사이 간격이 넓어 조금 좁힌다 */
-:root[data-skin="sketch"] body, :root[data-skin="sketch"] button, :root[data-skin="sketch"] input, :root[data-skin="sketch"] select, :root[data-skin="sketch"] textarea { letter-spacing: -.04em; }
+:root[data-skin="sketch"] body, :root[data-skin="sketch"] button, :root[data-skin="sketch"] input, :root[data-skin="sketch"] select, :root[data-skin="sketch"] textarea { letter-spacing: 0; }
 :root[data-skin="sketch"] .display, :root[data-skin="sketch"] .hero-time { letter-spacing: 0; }
 
 /* 손글씨 테마: 하루 요약(체력 · 경비 도넛)을 펜 · 형광펜 느낌으로 */
@@ -856,3 +856,7 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
 
 :root[data-skin="journey"] { --tt-head: #172221; }
 :root[data-skin="sketch"] { --tt-head: #2A2824; }
+
+/* 연필 글씨: 감자꽃체 + 큰 제목에만 흑연 결 */
+:root[data-skin="sketch"] body { font-size: 18px; }
+:root[data-skin="sketch"] .display, :root[data-skin="sketch"] .hero-time, :root[data-skin="sketch"] .hero-title, :root[data-skin="sketch"] .card-title, :root[data-skin="sketch"] #list-title { filter: url(#pencil); }
