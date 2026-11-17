@@ -859,7 +859,7 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
 
 /* 연필 글씨: 감자꽃체 + 큰 제목에만 흑연 결 */
 :root[data-skin="sketch"] body { font-size: 18px; }
-:root[data-skin="sketch"] .display, :root[data-skin="sketch"] .hero-time, :root[data-skin="sketch"] .hero-title, :root[data-skin="sketch"] .card-title, :root[data-skin="sketch"] #list-title { filter: url(#pencil); }
+
 
 /* 시간표 하루 요약: 판정 · 합계 한 줄, 큰 구분 셋, 넉넉한 여백 */
 :root .tt-dinfo { gap: 14px; padding: 16px 18px; }
@@ -948,4 +948,31 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
 
   /* 지금 시각 줄의 점: 은은하게 퍼진다 */
   .tt-now::before { animation: ping 2s ease-out infinite; }
+}
+
+/* ---------- 손그림 노트: 연필 글씨 ---------- */
+:root[data-skin="sketch"] { --graphite: #34343A; }
+/* 흑연 결 + 살짝 번진 가장자리 (손글씨 부분만, 작은 고운돋움 글씨는 또렷하게 둔다) */
+:root[data-skin="sketch"] :is(.display, .hero-time, .hero-title, .card-title, #list-title, .s-title > span:first-child, .s-time b, .dc-name b, .dc-num b, .dinfo-total b, .day-head, .exp-main b, .exp-num > b, .clock b, .stats b) {
+  filter: url(#pencil); text-shadow: 0 0 .7px rgba(52,52,58,.55), .3px .2px 0 rgba(52,52,58,.25); }
+:root[data-skin="sketch"] :is(.s-title > span:first-child, .card-title, #list-title, .display, .hero-title, .dc-name b, .exp-main b) { color: var(--graphite); }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* 쓰는 박자: 연필이 글자 단위로 끊어 가며 나아가듯 steps */
+  @keyframes pen-write { from { clip-path: inset(-20% 100% -20% -2%); } to { clip-path: inset(-20% -2% -20% -2%); } }
+  @keyframes pen-move { 0% { left: 0; opacity: 1; } 92% { left: 100%; opacity: 1; } 100% { left: 100%; opacity: 0; } }
+  /* 큰 제목: 연필 끝이 따라가며 쓴다 */
+  :root[data-skin="sketch"].anim[data-anim="view"] .view:not([hidden]) .display { animation: pen-write .9s .1s steps(16, end) both; clip-path: none; }
+  :root[data-skin="sketch"] .display::after { content: ""; position: absolute; top: -18px; left: 0; width: 34px; height: 34px; background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg transform='rotate(40 20 20)'%3E%3Crect x='16' y='2' width='8' height='24' rx='1' fill='%23F2C230' stroke='%232B2B30' stroke-width='1.4'/%3E%3Crect x='16' y='2' width='8' height='4' fill='%23E88FA0' stroke='%232B2B30' stroke-width='1.4'/%3E%3Cpath d='M16 26 L20 36 L24 26 Z' fill='%23F3DDB5' stroke='%232B2B30' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cpath d='M18.7 33 L20 36 L21.3 33 Z' fill='%232B2B30'/%3E%3C/g%3E%3C/svg%3E"); opacity: 0; pointer-events: none; }
+  :root[data-skin="sketch"].anim[data-anim="view"] .view:not([hidden]) .display::after { animation: pen-move .9s .1s steps(16, end) both; }
+  /* 카드 제목 · 일정 이름 · 시각 · 금액도 차례로 써진다 */
+  :root[data-skin="sketch"].anim .view:not([hidden]) :is(.card-title, #list-title, .hero-title, .hero-time, .dinfo-total b, .dc-name b, .dc-num b) { animation: pen-write .6s .25s steps(10, end) both; }
+  :root[data-skin="sketch"].anim .s-card .s-title > span:first-child, :root[data-skin="sketch"].anim .s-card .s-time b { animation: pen-write .55s steps(9, end) both; animation-delay: inherit; }
+  :root[data-skin="sketch"].anim .s-card:nth-child(1) :is(.s-title > span:first-child, .s-time b) { animation-delay: .15s; }
+  :root[data-skin="sketch"].anim .s-card:nth-child(2) :is(.s-title > span:first-child, .s-time b) { animation-delay: .3s; }
+  :root[data-skin="sketch"].anim .s-card:nth-child(3) :is(.s-title > span:first-child, .s-time b) { animation-delay: .45s; }
+  :root[data-skin="sketch"].anim .s-card:nth-child(4) :is(.s-title > span:first-child, .s-time b) { animation-delay: .6s; }
+  :root[data-skin="sketch"].anim .s-card:nth-child(n+5) :is(.s-title > span:first-child, .s-time b) { animation-delay: .75s; }
+  /* 시간표 칸 글씨도 칸이 붙은 뒤 써진다 */
+  :root[data-skin="sketch"].anim .tt-block span { animation: pen-write .45s steps(8, end) both; animation-delay: calc(min(var(--t), 900) * .45ms + .2s); }
 }

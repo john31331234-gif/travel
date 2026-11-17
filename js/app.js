@@ -364,7 +364,7 @@
     const h = document.documentElement;
     h.classList.remove('anim'); void h.offsetWidth;
     h.classList.add('anim'); h.dataset.anim = scope;
-    clearTimeout(animT); animT = setTimeout(() => { h.classList.remove('anim'); delete h.dataset.anim; }, 1100);
+    clearTimeout(animT); animT = setTimeout(() => { h.classList.remove('anim'); delete h.dataset.anim; }, 1900);
   };
   const setView = view => {
     animate();
