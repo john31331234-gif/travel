@@ -358,7 +358,16 @@
   })();
 
   // ---------- 화면: 공통 ----------
+  // 화면 · 날짜를 바꿀 때만 잠깐 등장 애니메이션을 켠다 (1분마다 다시 그릴 때는 움직이지 않게)
+  let animT = null;
+  const animate = (scope = 'view') => {
+    const h = document.documentElement;
+    h.classList.remove('anim'); void h.offsetWidth;
+    h.classList.add('anim'); h.dataset.anim = scope;
+    clearTimeout(animT); animT = setTimeout(() => { h.classList.remove('anim'); delete h.dataset.anim; }, 1100);
+  };
   const setView = view => {
+    animate();
     state.view = view;
     $$('.view').forEach(v => { v.hidden = v.id !== 'view-' + view; });
     $$('.tab, .nav-item').forEach(b => { if (b.dataset.view === view) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
@@ -1666,12 +1675,12 @@
     if (t.id === 'ed-delete') { deleteItem(t); return; }
     if (t.hasAttribute('data-close')) { $('#detail').close(); return; }
     if (t.hasAttribute('data-sample')) { loadSample(); return; }
-    if (t.dataset.day) { state.day = t.dataset.day; renderToday(); return; }
+    if (t.dataset.day) { state.day = t.dataset.day; animate('day'); renderToday(); return; }
     if (t.dataset.stamina) { state.settings.stamina = t.dataset.stamina; save(); render(); return; }
-    if (t.dataset.tday) { state.ttDay = t.dataset.tday; renderSchedule(); return; }
-    if (t.dataset.smode) { state.settings.schedMode = t.dataset.smode; save(); renderSchedule(); return; }
+    if (t.dataset.tday) { state.ttDay = t.dataset.tday; animate('day'); renderSchedule(); return; }
+    if (t.dataset.smode) { state.settings.schedMode = t.dataset.smode; save(); animate('day'); renderSchedule(); return; }
     if (t.dataset.smodeTo) { state.settings.schedMode = t.dataset.smodeTo; save(); }
-    if (t.dataset.sday) { state.schedDay = t.dataset.sday; renderSchedule(); window.scrollTo({ top: 0 }); return; }
+    if (t.dataset.sday) { state.schedDay = t.dataset.sday; animate('day'); renderSchedule(); window.scrollTo({ top: 0 }); return; }
     if (t.dataset.skin) { state.settings.skin = t.dataset.skin; save(); applySkin(); render(); return; }
     if (t.dataset.lead != null) { state.settings.lead = +t.dataset.lead; save(); render(); return; }
     if (t.dataset.itemLead != null) {

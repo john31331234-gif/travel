@@ -903,3 +903,49 @@ body.tt-dragging, body.tt-dragging * { cursor: grabbing !important; -webkit-user
   :root .dc-name { grid-area: name; } :root .dc-num { grid-area: num; align-self: start; } :root .dc-bar { grid-area: bar; }
   .day-costs { gap: 18px; }
 }
+
+/* ---------- 애니메이션: 화면 · 날짜를 바꿀 때 한 번, 움직임 줄이기를 켜면 모두 멈춤 ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes pop { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+  @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  @keyframes spin-in { from { opacity: 0; transform: rotate(-120deg) scale(.7); } to { opacity: 1; transform: none; } }
+  @keyframes write { from { clip-path: inset(-10% 100% -10% 0); } to { clip-path: inset(-10% 0 -10% 0); } }
+  @keyframes sheet-up { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(-12px) scale(.98); } to { opacity: 1; transform: none; } }
+  @keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(217,72,28,.45); } 70%, 100% { box-shadow: 0 0 0 8px rgba(217,72,28,0); } }
+
+  /* 화면 전환: 머리 → 큰 카드 → 나머지가 차례로 올라온다 */
+  .anim[data-anim="view"] .view:not([hidden]) .page-head { animation: rise .45s cubic-bezier(.2,.7,.2,1) both; }
+  .anim[data-anim="view"] .view:not([hidden]) .hero { animation: rise .5s .06s cubic-bezier(.2,.7,.2,1) both; }
+  .anim[data-anim="view"] .view:not([hidden]) .card { animation: rise .5s .12s cubic-bezier(.2,.7,.2,1) both; }
+  .anim[data-anim="view"] .view:not([hidden]) .timetable { animation: fade .4s .08s both; }
+  /* 손그림 노트: 큰 제목이 왼쪽부터 써지듯 나타난다 */
+  :root[data-skin="sketch"].anim[data-anim="view"] .view:not([hidden]) .display { animation: write .7s .05s steps(14, end) both; }
+
+  /* 일정 카드: 위에서부터 하나씩 */
+  .anim .s-card { animation: rise .42s cubic-bezier(.2,.7,.2,1) both; }
+  .anim .s-card:nth-child(2) { animation-delay: .04s; } .anim .s-card:nth-child(3) { animation-delay: .08s; }
+  .anim .s-card:nth-child(4) { animation-delay: .12s; } .anim .s-card:nth-child(5) { animation-delay: .16s; }
+  .anim .s-card:nth-child(6) { animation-delay: .2s; } .anim .s-card:nth-child(n+7) { animation-delay: .24s; }
+
+  /* 시간표 칸: 이른 시간부터 차례로 붙는다 */
+  .anim .tt-block { animation: pop .38s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(min(var(--t), 900) * .45ms); }
+
+  /* 막대 · 도넛: 0에서 채워진다 */
+  .anim :is(.bar span, .dc-bar span, .load-bar i, .trip-card .bar span) { transform-origin: left center; animation: grow .7s .15s cubic-bezier(.2,.7,.2,1) both; }
+  .anim .donut { animation: spin-in .7s .1s cubic-bezier(.2,.7,.2,1) both; }
+
+  /* 시트(수정 창) · 알림 */
+  #detail[open] .sheet-inner { animation: sheet-up .32s cubic-bezier(.2,.7,.2,1) both; }
+  #detail[open]::backdrop { animation: fade .25s both; }
+  .toast { animation: toast-in .3s cubic-bezier(.2,.7,.2,1) both; }
+
+  /* 아래 탭 · 왼쪽 메뉴: 고른 표시가 톡 나타난다 */
+  .tab[aria-current="page"]::after { animation: pop .3s both; }
+  .tab[aria-current="page"] svg { animation: pop .3s both; }
+
+  /* 지금 시각 줄의 점: 은은하게 퍼진다 */
+  .tt-now::before { animation: ping 2s ease-out infinite; }
+}
