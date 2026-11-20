@@ -360,7 +360,10 @@
   // ---------- 화면: 공통 ----------
   // 화면 · 날짜를 바꿀 때만 잠깐 등장 애니메이션을 켠다 (1분마다 다시 그릴 때는 움직이지 않게)
   let animT = null;
+  // 사이트를 연 뒤 첫 화면에서만 (그 뒤 화면 · 날짜 전환에는 움직이지 않음)
+  let animDone = false;
   const animate = (scope = 'view') => {
+    if (animDone) return; animDone = true;
     const h = document.documentElement;
     h.classList.remove('anim'); void h.offsetWidth;
     h.classList.add('anim'); h.dataset.anim = scope;
